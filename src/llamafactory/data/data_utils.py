@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import os
 from enum import Enum, unique
 from typing import TYPE_CHECKING, Any, Optional, TypedDict, Union
 
@@ -20,6 +21,7 @@ import fsspec
 from datasets import DatasetDict, concatenate_datasets, interleave_datasets
 
 from ..extras import logging
+from ..extras.constants import FILEEXT2TYPE
 
 
 if TYPE_CHECKING:
@@ -165,6 +167,31 @@ def _read_json_with_fs(fs: "fsspec.AbstractFileSystem", path: str) -> list[Any]:
             return [json.loads(line) for line in f if line.strip()]
         else:
             return json.load(f)
+
+
+def get_cloud_files(cloud_path: str) -> tuple[str, list[str]]:
+    r"""List cloud files (S3/GCS) and infer dataset type from extension."""
+    try:
+        fs = setup_fs(cloud_path, anon=True)
+    except Exception:
+        fs = setup_fs(cloud_path)
+
+    if fs.isdir(cloud_path):
+        files = [p for p in fs.find(cloud_path) if fs.isfile(p)]
+    else:
+        files = [cloud_path]
+
+    files = [p for p in files if os.path.splitext(p)[-1][1:] in FILEEXT2TYPE]
+    if not files:
+        raise ValueError(
+            f"No supported files found in {cloud_path}. Allowed: {','.join(FILEEXT2TYPE.keys())}"
+        )
+
+    ext = os.path.splitext(files[0])[-1][1:]
+    if any(os.path.splitext(f)[-1][1:] != ext for f in files):
+        raise ValueError("File types should be identical.")
+
+    return FILEEXT2TYPE[ext], files
 
 
 def read_cloud_json(cloud_path: str) -> list[Any]:

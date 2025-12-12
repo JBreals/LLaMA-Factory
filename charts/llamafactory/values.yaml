@@ -3,8 +3,9 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-command: []
-args: []
+command:
+  - llamafactory-cli
+  - webui
 
 serviceAccount:
   create: true
@@ -17,6 +18,8 @@ resources:
   requests:
     cpu: 1
     memory: 8Gi
+    nvidia.com/gpu: 1
+  limits:
     nvidia.com/gpu: 1
 
 nodeSelector: {}
@@ -47,19 +50,47 @@ ingress:
   tls: []
 
 persistence:
-  enabled: false
+  enabled: true
   existingClaim: ""
-  storageClass: ""
+  storageClass: "qks-ceph-block"
   accessModes:
     - ReadWriteOnce
-  size: 50Gi
+  size: 100Gi
   mountPath: /app/storage
 
 env:
   # Default ports; override if needed
   GRADIO_SERVER_PORT: 7860
   API_PORT: 8000
-extraEnv: []
+extraEnv:
+  - name: HF_HOME
+    value: /app/storage/hf_home
+  - name: HF_HUB_CACHE
+    value: /app/storage/hf_home/hub
+  - name: TRANSFORMERS_CACHE
+    value: /app/storage/hf_home/hub
+  - name: HF_DATASETS_CACHE
+    value: /app/storage/hf_home/datasets
+  - name: MLFLOW_HOME
+    value: /app/storage/mlruns
+  # S3 endpoint & credentials (set values or override via your values file)
+  - name: AWS_ACCESS_KEY_ID
+    value: ""
+  - name: AWS_SECRET_ACCESS_KEY
+    value: ""
+  - name: AWS_DEFAULT_REGION
+    value: ""
+  - name: AWS_ENDPOINT_URL
+    value: ""
+  # MLflow tracking (set values or override via your values file)
+  - name: MLFLOW_TRACKING_URI
+    value: ""
+  - name: MLFLOW_EXPERIMENT_NAME
+    value: ""
+  - name: MLFLOW_TRACKING_USERNAME
+    value: ""
+  - name: MLFLOW_TRACKING_PASSWORD
+    value: ""
 
 envFrom: []
 

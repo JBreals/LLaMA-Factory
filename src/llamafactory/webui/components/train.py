@@ -42,11 +42,22 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
         stages = list(TRAINING_STAGES.keys())
         training_stage = gr.Dropdown(choices=stages, value=stages[0], scale=1)
         dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=1)
-        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=4)
+        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3)
+        custom_dataset_path = gr.Textbox(
+            placeholder="Optional: s3://bucket/path (콤마/줄바꿈으로 여러 개 입력 가능)", scale=3, lines=3
+        )
         preview_elems = create_preview_box(dataset_dir, dataset)
 
-    input_elems.update({training_stage, dataset_dir, dataset})
-    elem_dict.update(dict(training_stage=training_stage, dataset_dir=dataset_dir, dataset=dataset, **preview_elems))
+    input_elems.update({training_stage, dataset_dir, dataset, custom_dataset_path})
+    elem_dict.update(
+        dict(
+            training_stage=training_stage,
+            dataset_dir=dataset_dir,
+            dataset=dataset,
+            custom_dataset_path=custom_dataset_path,
+            **preview_elems,
+        )
+    )
 
     with gr.Row():
         learning_rate = gr.Textbox(value="5e-5")

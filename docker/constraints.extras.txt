@@ -3,7 +3,10 @@ bitsandbytes==0.43.3
 gptqmodel==2.0.0
 # awq 0.2.x line; pin to a stable minor
 awq==0.2.8
-aqlm[gpu]>=1.1.0
+# pip constraints 불문율: extras 불가 → aqlm 버전만 고정
+aqlm>=1.1.0
 hqq
 eetq
 swanlab
+mlflow==2.16.0
+s3fs==2023.12.2

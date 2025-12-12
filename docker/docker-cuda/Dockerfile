@@ -5,9 +5,10 @@ FROM ${BASE_IMAGE}
 # Installation arguments
 ARG PIP_INDEX=https://pypi.org/simple
 ARG EXTRAS=metrics
-ARG CONSTRAINTS_FILE=""
+ARG CONSTRAINTS_FILE="docker/constraints.extras.txt"
 ARG INSTALL_FLASHATTN=false
 ARG HTTP_PROXY=""
+ARG EXTRA_PIP=""
 
 # Define environments
 ENV MAX_JOBS=16
@@ -39,6 +40,11 @@ COPY . /app
 
 # Install LLaMA Factory
 RUN pip install --no-cache-dir -e ".[${EXTRAS}]" --no-build-isolation ${CONSTRAINTS_FILE:+-c ${CONSTRAINTS_FILE}}
+
+# Optional extra packages (e.g., mlflow)
+RUN if [ -n "${EXTRA_PIP}" ]; then \
+        pip install --no-cache-dir ${CONSTRAINTS_FILE:+-c ${CONSTRAINTS_FILE}} ${EXTRA_PIP}; \
+    fi
 
 # Rebuild flash attention
 RUN if [ "${INSTALL_FLASHATTN}" == "true" ]; then \

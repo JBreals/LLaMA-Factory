@@ -4,6 +4,7 @@
 .venv
 cache
 docker
+!docker/constraints.extras.txt
 saves
 hf_cache
 ms_cache

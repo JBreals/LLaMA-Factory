@@ -36,11 +36,16 @@ def create_eval_tab(engine: "Engine") -> dict[str, "Component"]:
 
     with gr.Row():
         dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=2)
-        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=4)
+        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3)
+        custom_dataset_path = gr.Textbox(
+            placeholder="Optional: s3://bucket/path (콤마/줄바꿈으로 여러 개 입력 가능)", scale=3, lines=3
+        )
         preview_elems = create_preview_box(dataset_dir, dataset)
 
-    input_elems.update({dataset_dir, dataset})
-    elem_dict.update(dict(dataset_dir=dataset_dir, dataset=dataset, **preview_elems))
+    input_elems.update({dataset_dir, dataset, custom_dataset_path})
+    elem_dict.update(
+        dict(dataset_dir=dataset_dir, dataset=dataset, custom_dataset_path=custom_dataset_path, **preview_elems)
+    )
 
     with gr.Row():
         cutoff_len = gr.Slider(minimum=4, maximum=131072, value=1024, step=1)

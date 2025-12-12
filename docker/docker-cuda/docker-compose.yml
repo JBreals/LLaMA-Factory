@@ -6,7 +6,8 @@ services:
       args:
         PIP_INDEX: https://pypi.org/simple
         EXTRAS: ${LLAMA_EXTRAS:-metrics}
-        CONSTRAINTS_FILE: ${LLAMA_CONSTRAINTS_FILE:-}
+        CONSTRAINTS_FILE: ${LLAMA_CONSTRAINTS_FILE:-docker/constraints.extras.txt}
+        EXTRA_PIP: ${LLAMA_EXTRA_PIP:-"mlflow s3fs"}
     container_name: llamafactory
     ports:
       - "7860:7860"

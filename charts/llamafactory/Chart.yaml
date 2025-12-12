@@ -1,6 +1,6 @@
 apiVersion: v2
 name: llamafactory
-version: 0.1.0
+version: 0.2.0
 appVersion: "latest"
 description: LLaMA Factory WebUI and API
 kubeVersion: ">=1.25.0"

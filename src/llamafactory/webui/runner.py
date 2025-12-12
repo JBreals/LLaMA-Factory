@@ -76,6 +76,7 @@ class Runner:
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
         lang, model_name, model_path = get("top.lang"), get("top.model_name"), get("top.model_path")
         dataset = get("train.dataset") if do_train else get("eval.dataset")
+        custom_dataset = get("train.custom_dataset_path") if do_train else get("eval.custom_dataset_path")
 
         if self.running:
             return ALERTS["err_conflict"][lang]
@@ -86,7 +87,7 @@ class Runner:
         if not model_path:
             return ALERTS["err_no_path"][lang]
 
-        if not dataset:
+        if not dataset and not custom_dataset:
             return ALERTS["err_no_dataset"][lang]
 
         if not from_preview and self.demo_mode:
@@ -129,6 +130,21 @@ class Runner:
         model_name, finetuning_type = get("top.model_name"), get("top.finetuning_type")
         user_config = load_config()
 
+        custom_dataset_path = get("train.custom_dataset_path")
+        custom_datasets = (
+            [x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()]
+            if custom_dataset_path
+            else []
+        )
+        # resolve output dir prefix
+        raw_output_dir = get("train.output_dir")
+        if raw_output_dir and not os.path.isabs(raw_output_dir):
+            resolved_output_dir = os.path.join("/app/storage/runs", raw_output_dir)
+        elif raw_output_dir:
+            resolved_output_dir = raw_output_dir
+        else:
+            resolved_output_dir = os.path.join("/app/storage/runs", f"train_{get('train.current_time')}")
+
         args = dict(
             stage=TRAINING_STAGES[get("train.training_stage")],
             do_train=True,
@@ -167,7 +183,7 @@ class Runner:
             use_apollo=get("train.use_apollo"),
             use_badam=get("train.use_badam"),
             use_swanlab=get("train.use_swanlab"),
-            output_dir=get_save_dir(model_name, finetuning_type, get("train.output_dir")),
+            output_dir=get_save_dir(model_name, finetuning_type, resolved_output_dir),
             fp16=(get("train.compute_type") == "fp16"),
             bf16=(get("train.compute_type") == "bf16"),
             pure_bf16=(get("train.compute_type") == "pure_bf16"),
@@ -180,12 +196,17 @@ class Runner:
 
         # checkpoints
         if get("top.checkpoint_path"):
-            if finetuning_type in PEFT_METHODS:  # list
-                args["adapter_name_or_path"] = ",".join(
-                    [get_save_dir(model_name, finetuning_type, adapter) for adapter in get("top.checkpoint_path")]
+            def _resolve_ckpt(p: str) -> str:
+                return (
+                    p
+                    if os.path.isabs(p)
+                    else get_save_dir(model_name, finetuning_type, os.path.join("/app/storage/runs", p))
                 )
+
+            if finetuning_type in PEFT_METHODS:  # list
+                args["adapter_name_or_path"] = ",".join([_resolve_ckpt(p) for p in get("top.checkpoint_path")])
             else:  # str
-                args["model_name_or_path"] = get_save_dir(model_name, finetuning_type, get("top.checkpoint_path"))
+                args["model_name_or_path"] = _resolve_ckpt(get("top.checkpoint_path"))
 
         # quantization
         if get("top.quantization_bit") != "none":
@@ -274,6 +295,16 @@ class Runner:
             args["swanlab_api_key"] = get("train.swanlab_api_key")
             args["swanlab_mode"] = get("train.swanlab_mode")
 
+        # custom dataset (cloud)
+        if custom_datasets:
+            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(custom_datasets)}
+            args["dataset_dir"] = ds_dir_dict
+            ds_names = [f"custom_cloud_{i}" for i in range(len(custom_datasets))]
+            if args["dataset"]:
+                args["dataset"] += "," + ",".join(ds_names)
+            else:
+                args["dataset"] = ",".join(ds_names)
+
         # eval config
         if get("train.val_size") > 1e-6 and args["stage"] != "ppo":
             args["val_size"] = get("train.val_size")
@@ -294,6 +325,20 @@ class Runner:
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
         model_name, finetuning_type = get("top.model_name"), get("top.finetuning_type")
         user_config = load_config()
+        custom_dataset_path = get("eval.custom_dataset_path")
+        custom_datasets = (
+            [x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()]
+            if custom_dataset_path
+            else []
+        )
+
+        raw_output_dir = get("eval.output_dir")
+        if raw_output_dir and not os.path.isabs(raw_output_dir):
+            resolved_output_dir = os.path.join("/app/storage/runs", raw_output_dir)
+        elif raw_output_dir:
+            resolved_output_dir = raw_output_dir
+        else:
+            resolved_output_dir = os.path.join("/app/storage/runs", f"eval_{get('train.current_time')}")
 
         args = dict(
             stage="sft",
@@ -316,10 +361,19 @@ class Runner:
             max_new_tokens=get("eval.max_new_tokens"),
             top_p=get("eval.top_p"),
             temperature=get("eval.temperature"),
-            output_dir=get_save_dir(model_name, finetuning_type, get("eval.output_dir")),
+            output_dir=get_save_dir(model_name, finetuning_type, resolved_output_dir),
             trust_remote_code=True,
             ddp_timeout=180000000,
         )
+
+        if custom_datasets:
+            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(custom_datasets)}
+            args["dataset_dir"] = ds_dir_dict
+            ds_names = [f"custom_cloud_{i}" for i in range(len(custom_datasets))]
+            if args["eval_dataset"]:
+                args["eval_dataset"] += "," + ",".join(ds_names)
+            else:
+                args["eval_dataset"] = ",".join(ds_names)
 
         if get("eval.predict"):
             args["do_predict"] = True
@@ -328,12 +382,17 @@ class Runner:
 
         # checkpoints
         if get("top.checkpoint_path"):
-            if finetuning_type in PEFT_METHODS:  # list
-                args["adapter_name_or_path"] = ",".join(
-                    [get_save_dir(model_name, finetuning_type, adapter) for adapter in get("top.checkpoint_path")]
+            def _resolve_ckpt(p: str) -> str:
+                return (
+                    p
+                    if os.path.isabs(p)
+                    else get_save_dir(model_name, finetuning_type, os.path.join("/app/storage/runs", p))
                 )
+
+            if finetuning_type in PEFT_METHODS:  # list
+                args["adapter_name_or_path"] = ",".join([_resolve_ckpt(p) for p in get("top.checkpoint_path")])
             else:  # str
-                args["model_name_or_path"] = get_save_dir(model_name, finetuning_type, get("top.checkpoint_path"))
+                args["model_name_or_path"] = _resolve_ckpt(get("top.checkpoint_path"))
 
         # quantization
         if get("top.quantization_bit") != "none":

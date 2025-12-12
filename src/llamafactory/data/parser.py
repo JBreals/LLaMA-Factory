@@ -28,7 +28,7 @@ class DatasetAttr:
     r"""Dataset attributes."""
 
     # basic configs
-    load_from: Literal["hf_hub", "ms_hub", "om_hub", "script", "file"]
+    load_from: Literal["hf_hub", "ms_hub", "om_hub", "script", "file", "cloud_file"]
     dataset_name: str
     formatting: Literal["alpaca", "sharegpt", "openai"] = "alpaca"
     ranking: bool = False

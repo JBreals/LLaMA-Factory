@@ -22,7 +22,7 @@ from ..extras import logging
 from ..extras.constants import FILEEXT2TYPE
 from ..extras.misc import check_version, has_tokenized_data
 from .converter import align_dataset
-from .data_utils import get_dataset_module, merge_dataset, read_cloud_json, split_dataset
+from .data_utils import get_cloud_files, get_dataset_module, merge_dataset, read_cloud_json, split_dataset
 from .parser import get_dataset_list
 from .processor import (
     FeedbackDatasetProcessor,
@@ -126,7 +126,17 @@ def _load_single_dataset(
             streaming=data_args.streaming,
         )
     elif dataset_attr.load_from == "cloud_file":
-        dataset = Dataset.from_list(read_cloud_json(data_path), split=dataset_attr.split)
+        # accept cloud paths with supported extensions (json/jsonl/csv/parquet/arrow/txt)
+        data_path, data_files = get_cloud_files(dataset_attr.dataset_name)
+        dataset = load_dataset(
+            path=data_path,
+            data_files=data_files,
+            split=dataset_attr.split,
+            cache_dir=model_args.cache_dir,
+            token=model_args.hf_hub_token,
+            num_proc=data_args.preprocessing_num_workers,
+            streaming=data_args.streaming,
+        )
     else:
         dataset = load_dataset(
             path=data_path,
