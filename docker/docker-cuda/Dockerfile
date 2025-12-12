@@ -5,6 +5,7 @@ FROM ${BASE_IMAGE}
 # Installation arguments
 ARG PIP_INDEX=https://pypi.org/simple
 ARG EXTRAS=metrics
+ARG CONSTRAINTS_FILE=""
 ARG INSTALL_FLASHATTN=false
 ARG HTTP_PROXY=""
 
@@ -37,7 +38,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app
 
 # Install LLaMA Factory
-RUN pip install --no-cache-dir -e ".[${EXTRAS}]" --no-build-isolation
+RUN pip install --no-cache-dir -e ".[${EXTRAS}]" --no-build-isolation ${CONSTRAINTS_FILE:+-c ${CONSTRAINTS_FILE}}
 
 # Rebuild flash attention
 RUN if [ "${INSTALL_FLASHATTN}" == "true" ]; then \

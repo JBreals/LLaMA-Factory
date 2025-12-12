@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "llamafactory.fullname" . }}
+  labels:
+    {{- include "llamafactory.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.service.annotations | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "llamafactory.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: webui
+      port: {{ .Values.ports.webui }}
+      targetPort: webui
+    - name: api
+      port: {{ .Values.ports.api }}
+      targetPort: api
