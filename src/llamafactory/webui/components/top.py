@@ -42,7 +42,7 @@ def create_top() -> dict[str, "Component"]:
     with gr.Row():
         lang = gr.Dropdown(choices=["en", "ru", "zh", "ko", "ja"], value=None, scale=1)
         available_models = list(SUPPORTED_MODELS.keys()) + ["Custom"]
-        model_name = gr.Dropdown(choices=available_models, value=None, scale=2)
+        model_name = gr.Dropdown(choices=available_models, value=None, scale=2, allow_custom_value=True)
         model_name_text = gr.Textbox(
             scale=2, placeholder="Model name (s3에서 비우면 경로 끝 이름으로 자동 설정)", visible=False
         )
@@ -68,7 +68,9 @@ def create_top() -> dict[str, "Component"]:
     model_name.input(save_config, inputs=[lang, hub_name, model_name], queue=False)
     model_name_text.input(save_config, inputs=[lang, hub_name, model_name_text], queue=False)
     model_path.input(save_config, inputs=[lang, hub_name, model_name, model_path], queue=False)
-    model_path.change(suggest_model_name, [hub_name, model_path, model_name_text, model_name], [model_name_text], queue=False)
+    model_path.change(
+        suggest_model_name, [hub_name, model_path, model_name_text, model_name], [model_name_text], queue=False
+    )
     finetuning_type.change(can_quantize, [finetuning_type], [quantization_bit], queue=False).then(
         list_checkpoints, [model_name, finetuning_type], [checkpoint_path], queue=False
     )
@@ -83,15 +85,22 @@ def create_top() -> dict[str, "Component"]:
     )
     hub_name.input(save_config, inputs=[lang, hub_name], queue=False)
     data_source.input(save_config, inputs=[lang], queue=False)
-    hub_name.change(
-        lambda h, n_sel, n_txt: (
-            gr.Dropdown(visible=(h != "s3"), value=n_sel if h != "s3" else n_sel),
-            gr.Textbox(visible=(h == "s3"), value=n_txt if h == "s3" else n_txt),
-        ),
-        [hub_name, model_name, model_name_text],
-        [model_name, model_name_text],
-        queue=False,
-    )
+    def _toggle_model_input(h: str, n_sel: str | None, n_txt: str | None):
+        if h == "s3":
+            # hide dropdown, show textbox; carry over text or fallback to dropdown value
+            txt_val = n_txt or (n_sel if n_sel not in available_models else "")
+            return (
+                gr.Dropdown(visible=False, choices=available_models, value=None),
+                gr.Textbox(visible=True, value=txt_val),
+            )
+        # non-s3: show dropdown, hide textbox; ensure value is in choices
+        safe_val = n_sel if n_sel in available_models else ("Custom" if "Custom" in available_models else available_models[0])
+        return (
+            gr.Dropdown(visible=True, choices=available_models, value=safe_val),
+            gr.Textbox(visible=False, value=n_txt),
+        )
+
+    hub_name.change(_toggle_model_input, [hub_name, model_name, model_name_text], [model_name, model_name_text], queue=False)
     model_name_text.change(lambda x: x, [model_name_text], [model_name], queue=False)
 
     return dict(
