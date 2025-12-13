@@ -212,13 +212,6 @@ class Runner:
         else:
             args["dataset_dir"] = get("train.dataset_dir")
             args["dataset"] = ",".join(dataset_list)
-        report_to = args["report_to"]
-        report_to_list = report_to if isinstance(report_to, list) else [report_to]
-        mlflow_experiment = get("train.mlflow_experiment")
-        if mlflow_experiment and any(logger in ["mlflow", "all"] for logger in report_to_list):
-            args["mlflow_experiment_name"] = mlflow_experiment
-        if any(logger in ["mlflow", "all"] for logger in report_to_list):
-            args["mlflow_log_artifacts"] = get("train.mlflow_log_artifacts")
         args.update(json.loads(get("train.extra_args")))
 
         # checkpoints
