@@ -62,12 +62,18 @@ def create_top() -> dict[str, "Component"]:
         rope_scaling = gr.Dropdown(choices=["none", "linear", "dynamic", "yarn", "llama3"], value="none")
         booster = gr.Dropdown(choices=["auto", "flashattn2", "unsloth", "liger_kernel"], value="auto")
 
-    model_name.change(get_model_info, [model_name], [model_path, template], queue=False).then(
+    def _fill_model_info(name: str | None, hub: str, cur_path: str | None, cur_tmpl: str | None):
+        if hub == "s3" or name not in available_models:
+            return gr.Textbox.update(value=cur_path), gr.Dropdown.update(value=cur_tmpl)
+        path, tmpl = get_model_info(name)
+        return gr.Textbox.update(value=path), gr.Dropdown.update(value=tmpl)
+
+    model_name.change(_fill_model_info, [model_name, hub_name, model_path, template], [model_path, template], queue=False).then(
         list_checkpoints, [model_name, finetuning_type], [checkpoint_path], queue=False
     ).then(check_template, [lang, template])
-    model_name.input(save_config, inputs=[lang, hub_name, model_name], queue=False)
-    model_name_text.input(save_config, inputs=[lang, hub_name, model_name_text], queue=False)
-    model_path.input(save_config, inputs=[lang, hub_name, model_name, model_path], queue=False)
+    model_name.input(save_config, inputs=[lang, hub_name, model_name, model_path, data_source], queue=False)
+    model_name_text.input(save_config, inputs=[lang, hub_name, model_name_text, model_path, data_source], queue=False)
+    model_path.input(save_config, inputs=[lang, hub_name, model_name, model_path, data_source], queue=False)
     model_path.change(
         suggest_model_name, [hub_name, model_path, model_name_text, model_name], [model_name_text], queue=False
     )
@@ -83,24 +89,30 @@ def create_top() -> dict[str, "Component"]:
     ).then(
         suggest_model_name, [hub_name, model_path, model_name_text, model_name], [model_name_text], queue=False
     )
-    hub_name.input(save_config, inputs=[lang, hub_name], queue=False)
-    data_source.input(save_config, inputs=[lang], queue=False)
-    def _toggle_model_input(h: str, n_sel: str | None, n_txt: str | None):
+    hub_name.input(save_config, inputs=[lang, hub_name, model_name, model_path, data_source], queue=False)
+    data_source.input(save_config, inputs=[lang, hub_name, model_name, model_path, data_source], queue=False)
+    def _toggle_model_input(h: str, n_sel: str | None, n_txt: str | None, m_path: str | None):
         if h == "s3":
-            # hide dropdown, show textbox; carry over text or fallback to dropdown value
-            txt_val = n_txt or (n_sel if n_sel not in available_models else "")
+            leaf = ""
+            if not n_txt and m_path:
+                cleaned = m_path.rstrip("/")
+                leaf = cleaned.split("/")[-1] if cleaned else ""
+            txt_val = n_txt or leaf or (n_sel if n_sel not in available_models else "")
             return (
-                gr.Dropdown(visible=False, choices=available_models, value=None),
-                gr.Textbox(visible=True, value=txt_val),
+                gr.Dropdown.update(visible=False, value=None),
+                gr.Textbox.update(visible=True, value=txt_val),
             )
-        # non-s3: show dropdown, hide textbox; ensure value is in choices
-        safe_val = n_sel if n_sel in available_models else ("Custom" if "Custom" in available_models else available_models[0])
+        safe_val = (
+            n_sel if n_sel in available_models else ("Custom" if "Custom" in available_models else available_models[0])
+        )
         return (
-            gr.Dropdown(visible=True, choices=available_models, value=safe_val),
-            gr.Textbox(visible=False, value=n_txt),
+            gr.Dropdown.update(visible=True, value=safe_val),
+            gr.Textbox.update(visible=False, value=n_txt),
         )
 
-    hub_name.change(_toggle_model_input, [hub_name, model_name, model_name_text], [model_name, model_name_text], queue=False)
+    hub_name.change(
+        _toggle_model_input, [hub_name, model_name, model_name_text, model_path], [model_name, model_name_text], queue=False
+    )
     model_name_text.change(lambda x: x, [model_name_text], [model_name], queue=False)
 
     return dict(

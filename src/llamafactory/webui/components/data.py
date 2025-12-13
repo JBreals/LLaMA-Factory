@@ -47,7 +47,7 @@ def can_preview(dataset_dir: str, dataset: list) -> "gr.Button":
     except Exception:
         return gr.Button(interactive=False)
 
-    if len(dataset) == 0 or "file_name" not in dataset_info[dataset[0]]:
+    if len(dataset) == 0 or dataset[0] not in dataset_info or "file_name" not in dataset_info[dataset[0]]:
         return gr.Button(interactive=False)
 
     data_path = os.path.join(dataset_dir, dataset_info[dataset[0]]["file_name"])
@@ -71,6 +71,9 @@ def get_preview(dataset_dir: str, dataset: list, page_index: int) -> tuple[int, 
     r"""Get the preview samples from the dataset."""
     with open(os.path.join(dataset_dir, DATA_CONFIG), encoding="utf-8") as f:
         dataset_info = json.load(f)
+
+    if len(dataset) == 0 or dataset[0] not in dataset_info or "file_name" not in dataset_info[dataset[0]]:
+        return 0, [], gr.Column(visible=False)
 
     data_path = os.path.join(dataset_dir, dataset_info[dataset[0]]["file_name"])
     if os.path.isfile(data_path):

@@ -78,11 +78,15 @@ def load_config() -> dict[str, Union[str, dict[str, Any]]]:
         with open(_get_config_path(), encoding="utf-8") as f:
             return safe_load(f)
     except Exception:
-        return {"lang": None, "hub_name": None, "last_model": None, "path_dict": {}, "cache_dir": None}
+        return {"lang": None, "hub_name": None, "last_model": None, "path_dict": {}, "cache_dir": None, "data_source": None}
 
 
 def save_config(
-    lang: str, hub_name: Optional[str] = None, model_name: Optional[str] = None, model_path: Optional[str] = None
+    lang: str,
+    hub_name: Optional[str] = None,
+    model_name: Optional[str] = None,
+    model_path: Optional[str] = None,
+    data_source: Optional[str] = None,
 ) -> None:
     r"""Save user config."""
     os.makedirs(DEFAULT_CACHE_DIR, exist_ok=True)
@@ -96,6 +100,8 @@ def save_config(
 
     if model_name and model_path:
         user_config["path_dict"][model_name] = model_path
+    if data_source:
+        user_config["data_source"] = data_source
 
     with open(_get_config_path(), "w", encoding="utf-8") as f:
         safe_dump(user_config, f)
