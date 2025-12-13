@@ -61,6 +61,7 @@ class Manager:
             self._id_to_elem["top.model_name"],
             self._id_to_elem["top.model_name_text"],
             self._id_to_elem["top.model_path"],
+            self._id_to_elem["top.hub_name"],
             self._id_to_elem["top.finetuning_type"],
             self._id_to_elem["top.checkpoint_path"],
             self._id_to_elem["top.quantization_bit"],
