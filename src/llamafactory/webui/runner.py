@@ -131,11 +131,14 @@ class Runner:
         user_config = load_config()
 
         custom_dataset_path = get("train.custom_dataset_path")
-        custom_datasets = (
-            [x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()]
-            if custom_dataset_path
-            else []
-        )
+        if isinstance(custom_dataset_path, list):
+            custom_datasets = [x.strip() for x in custom_dataset_path if isinstance(x, str) and x.strip()]
+        elif isinstance(custom_dataset_path, str):
+            custom_datasets = [
+                x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()
+            ]
+        else:
+            custom_datasets = []
         # resolve output dir prefix
         raw_output_dir = get("train.output_dir")
         if raw_output_dir and not os.path.isabs(raw_output_dir):
@@ -192,6 +195,13 @@ class Runner:
             ddp_timeout=180000000,
             include_num_input_tokens_seen=True,
         )
+        report_to = args["report_to"]
+        report_to_list = report_to if isinstance(report_to, list) else [report_to]
+        mlflow_experiment = get("train.mlflow_experiment")
+        if mlflow_experiment and any(logger in ["mlflow", "all"] for logger in report_to_list):
+            args["mlflow_experiment_name"] = mlflow_experiment
+        if any(logger in ["mlflow", "all"] for logger in report_to_list):
+            args["mlflow_log_artifacts"] = get("train.mlflow_log_artifacts")
         args.update(json.loads(get("train.extra_args")))
 
         # checkpoints
@@ -326,11 +336,14 @@ class Runner:
         model_name, finetuning_type = get("top.model_name"), get("top.finetuning_type")
         user_config = load_config()
         custom_dataset_path = get("eval.custom_dataset_path")
-        custom_datasets = (
-            [x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()]
-            if custom_dataset_path
-            else []
-        )
+        if isinstance(custom_dataset_path, list):
+            custom_datasets = [x.strip() for x in custom_dataset_path if isinstance(x, str) and x.strip()]
+        elif isinstance(custom_dataset_path, str):
+            custom_datasets = [
+                x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()
+            ]
+        else:
+            custom_datasets = []
 
         raw_output_dir = get("eval.output_dir")
         if raw_output_dir and not os.path.isabs(raw_output_dir):
@@ -432,6 +445,14 @@ class Runner:
             env["LLAMABOARD_WORKDIR"] = args["output_dir"]
             if args.get("deepspeed", None) is not None:
                 env["FORCE_TORCHRUN"] = "1"
+            report_to = args.get("report_to", [])
+            report_to_list = report_to if isinstance(report_to, list) else [report_to]
+            mlflow_experiment = data.get(self.manager.get_elem_by_id("train.mlflow_experiment"), "")
+            if mlflow_experiment and any(logger in ["mlflow", "all"] for logger in report_to_list):
+                env["MLFLOW_EXPERIMENT_NAME"] = mlflow_experiment
+            if any(logger in ["mlflow", "all"] for logger in report_to_list):
+                log_artifacts = data.get(self.manager.get_elem_by_id("train.mlflow_log_artifacts"), True)
+                env["HF_MLFLOW_LOG_ARTIFACTS"] = "1" if log_artifacts else "0"
 
             # NOTE: DO NOT USE shell=True to avoid security risk
             self.trainer = Popen(["llamafactory-cli", "train", save_cmd(args)], env=env, stderr=PIPE, text=True)

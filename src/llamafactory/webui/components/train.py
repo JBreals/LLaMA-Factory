@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from typing import TYPE_CHECKING
 
 from transformers.trainer_utils import SchedulerType
@@ -43,8 +44,12 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
         training_stage = gr.Dropdown(choices=stages, value=stages[0], scale=1)
         dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=1)
         dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3)
-        custom_dataset_path = gr.Textbox(
-            placeholder="Optional: s3://bucket/path (콤마/줄바꿈으로 여러 개 입력 가능)", scale=3, lines=3
+        custom_dataset_path = gr.Dropdown(
+            multiselect=True,
+            allow_custom_value=True,
+            scale=3,
+            value=[],
+            placeholder="Optional: s3://bucket/path (엔터로 여러 개 추가)",
         )
         preview_elems = create_preview_box(dataset_dir, dataset)
 
@@ -123,6 +128,8 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
                     value="none",
                     allow_custom_value=True,
                 )
+                mlflow_experiment = gr.Textbox(value=os.getenv("MLFLOW_EXPERIMENT_NAME", ""))
+                mlflow_log_artifacts = gr.Checkbox(value=True)
 
     input_elems.update(
         {
@@ -139,6 +146,8 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
             use_llama_pro,
             enable_thinking,
             report_to,
+            mlflow_experiment,
+            mlflow_log_artifacts,
         }
     )
     elem_dict.update(
@@ -157,6 +166,8 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
             use_llama_pro=use_llama_pro,
             enable_thinking=enable_thinking,
             report_to=report_to,
+            mlflow_experiment=mlflow_experiment,
+            mlflow_log_artifacts=mlflow_log_artifacts,
         )
     )
 

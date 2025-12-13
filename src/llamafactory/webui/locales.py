@@ -991,6 +991,50 @@ LOCALES = {
             "info": "TensorBoard または wandb を使用して実験を記録します。",
         },
     },
+    "mlflow_experiment": {
+        "en": {
+            "label": "MLflow experiment",
+            "info": "Leave blank to use the experiment name from environment variables.",
+        },
+        "ru": {
+            "label": "Эксперимент MLflow",
+            "info": "Если пусто, используется имя из переменной окружения.",
+        },
+        "zh": {
+            "label": "MLflow 实验名称",
+            "info": "留空则使用环境变量中的实验名称。",
+        },
+        "ko": {
+            "label": "MLflow 실험 이름",
+            "info": "비워두면 환경변수에 설정된 실험 이름을 사용합니다.",
+        },
+        "ja": {
+            "label": "MLflow 実験名",
+            "info": "空の場合は環境変数の値を使用します。",
+        },
+    },
+    "mlflow_log_artifacts": {
+        "en": {
+            "label": "Save model artifacts to MLflow",
+            "info": "Toggle to control whether checkpoints/artifacts are logged.",
+        },
+        "ru": {
+            "label": "Сохранять артефакты модели в MLflow",
+            "info": "Включите, чтобы логировать контрольные точки/артефакты.",
+        },
+        "zh": {
+            "label": "将模型产物保存到 MLflow",
+            "info": "控制是否上传检查点/产物。",
+        },
+        "ko": {
+            "label": "MLflow에 모델 아티팩트 저장",
+            "info": "체크포인트/아티팩트 로깅 여부를 제어합니다.",
+        },
+        "ja": {
+            "label": "モデルアーティファクトを MLflow に保存",
+            "info": "チェックポイント/アーティファクトを記録するかどうかを切り替えます。",
+        },
+    },
     "freeze_tab": {
         "en": {
             "label": "Freeze tuning configurations",
@@ -3154,12 +3198,12 @@ ALERTS = {
         "ko": "✅ 생각이 완료되었습니다",
         "ja": "✅ 思考完了",
     },
-    "info_exporting": {
-        "en": "Exporting model...",
-        "ru": "Экспорт модели...",
-        "zh": "正在导出模型……",
-        "ko": "모델 내보내기 중...",
-        "ja": "モデルをエクスポート中...",
+    "info_export_local": {
+        "en": "🌀 Saving locally <span class='pulse-dot'>●</span>",
+        "ru": "🌀 Сохранение локально <span class='pulse-dot'>●</span>",
+        "zh": "🌀 正在本地保存 <span class='pulse-dot'>●</span>",
+        "ko": "🌀 로컬에 저장 중 <span class='pulse-dot'>●</span>",
+        "ja": "🌀 ローカルに保存中 <span class='pulse-dot'>●</span>",
     },
     "info_exported": {
         "en": "Model exported.",
@@ -3167,6 +3211,41 @@ ALERTS = {
         "zh": "模型导出完成。",
         "ko": "모델이 내보내졌습니다.",
         "ja": "モデルのエクスポートが完了しました。",
+    },
+    "info_export_uploading": {
+        "en": "🚀 Uploading exported model to <span class='pulse-dot'>●</span> ",
+        "ru": "🚀 Загрузка экспортированной модели в <span class='pulse-dot'>●</span> ",
+        "zh": "🚀 正在上传导出的模型到 <span class='pulse-dot'>●</span> ",
+        "ko": "🚀 내보낸 모델을 업로드 중 <span class='pulse-dot'>●</span> ",
+        "ja": "🚀 エクスポートしたモデルをアップロード中 <span class='pulse-dot'>●</span> ",
+    },
+    "info_export_uploaded": {
+        "en": "✅ Uploaded to ",
+        "ru": "✅ Загружено в ",
+        "zh": "✅ 已上传到 ",
+        "ko": "✅ 업로드 완료: ",
+        "ja": "✅ アップロード完了: ",
+    },
+    "err_export_upload_not_found": {
+        "en": "aws CLI not found. Install awscli or set a local export_dir.",
+        "ru": "aws CLI не найден. Установите awscli или используйте локальный export_dir.",
+        "zh": "未找到 aws CLI。请安装 awscli 或使用本地 export_dir。",
+        "ko": "aws CLI를 찾을 수 없습니다. awscli를 설치하거나 로컬 export_dir을 사용하세요.",
+        "ja": "aws CLI が見つかりません。awscli をインストールするかローカル export_dir を使用してください。",
+    },
+    "err_export_upload_failed": {
+        "en": "Upload to S3 failed.",
+        "ru": "Загрузка в S3 не удалась.",
+        "zh": "上传到 S3 失败。",
+        "ko": "S3 업로드에 실패했습니다.",
+        "ja": "S3 へのアップロードに失敗しました。",
+    },
+    "err_export_local_failed": {
+        "en": "Local export failed.",
+        "ru": "Локальный экспорт не удался.",
+        "zh": "本地导出失败。",
+        "ko": "로컬 내보내기에 실패했습니다.",
+        "ja": "ローカルへのエクスポートに失敗しました。",
     },
     "info_swanlab_link": {
         "en": "### SwanLab Link\n",

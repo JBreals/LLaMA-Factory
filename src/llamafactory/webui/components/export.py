@@ -13,6 +13,10 @@
 # limitations under the License.
 
 import json
+import os
+import shutil
+import subprocess
+import tempfile
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Union
 
@@ -62,6 +66,13 @@ def save_model(
 ) -> Generator[str, None, None]:
     user_config = load_config()
     error = ""
+    is_s3_export = isinstance(export_dir, str) and export_dir.startswith("s3://")
+    upload_target = export_dir if is_s3_export else None
+    if is_s3_export:
+        export_tmp_root = os.getenv("EXPORT_TMP_ROOT", "/app/storage/exports")
+        os.makedirs(export_tmp_root, exist_ok=True)
+        export_dir = tempfile.mkdtemp(prefix="export_", dir=export_tmp_root)
+
     if not model_name:
         error = ALERTS["err_no_model"][lang]
     elif not model_path:
@@ -109,9 +120,46 @@ def save_model(
         else:  # str
             args["model_name_or_path"] = get_save_dir(model_name, finetuning_type, checkpoint_path)
 
-    yield ALERTS["info_exporting"][lang]
-    export_model(args)
-    torch_gc()
+    yield ALERTS["info_export_local"][lang]
+    try:
+        export_model(args)
+        torch_gc()
+    except Exception as e:
+        msg = ALERTS["err_export_local_failed"][lang] + f"\n\n```\n{e}\n```"
+        gr.Warning(msg)
+        if is_s3_export:
+            try:
+                shutil.rmtree(export_dir)
+            except Exception:
+                pass
+        yield msg
+        return
+    if is_s3_export:
+        try:
+            yield ALERTS["info_export_uploading"][lang] + upload_target
+            completed = subprocess.run(
+                ["aws", "s3", "sync", export_dir, upload_target],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            yield ALERTS["info_export_uploaded"][lang] + upload_target
+        except FileNotFoundError:
+            msg = ALERTS["err_export_upload_not_found"][lang]
+            gr.Warning(msg)
+            yield msg
+            return
+        except subprocess.CalledProcessError as e:
+            msg = ALERTS["err_export_upload_failed"][lang] + f"\n\n```\n{e.stderr}\n```"
+            gr.Warning(msg)
+            yield msg
+            return
+        finally:
+            try:
+                shutil.rmtree(export_dir)
+            except Exception:
+                pass
+
     yield ALERTS["info_exported"][lang]
 
 
@@ -132,7 +180,7 @@ def create_export_tab(engine: "Engine") -> dict[str, "Component"]:
     checkpoint_path.change(can_quantize, [checkpoint_path], [export_quantization_bit], queue=False)
 
     export_btn = gr.Button()
-    info_box = gr.Textbox(show_label=False, interactive=False)
+    info_box = gr.Markdown(show_label=False, elem_classes=["export-status"])
 
     export_btn.click(
         save_model,

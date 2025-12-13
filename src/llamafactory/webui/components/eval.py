@@ -37,8 +37,12 @@ def create_eval_tab(engine: "Engine") -> dict[str, "Component"]:
     with gr.Row():
         dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=2)
         dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3)
-        custom_dataset_path = gr.Textbox(
-            placeholder="Optional: s3://bucket/path (콤마/줄바꿈으로 여러 개 입력 가능)", scale=3, lines=3
+        custom_dataset_path = gr.Dropdown(
+            multiselect=True,
+            allow_custom_value=True,
+            scale=3,
+            value=[],
+            placeholder="Optional: s3://bucket/path (엔터로 여러 개 추가)",
         )
         preview_elems = create_preview_box(dataset_dir, dataset)
 

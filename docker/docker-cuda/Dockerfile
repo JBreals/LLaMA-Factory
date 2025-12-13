@@ -8,7 +8,7 @@ ARG EXTRAS=metrics
 ARG CONSTRAINTS_FILE="docker/constraints.extras.txt"
 ARG INSTALL_FLASHATTN=false
 ARG HTTP_PROXY=""
-ARG EXTRA_PIP=""
+ARG EXTRA_PIP="mlflow s3fs"
 
 # Define environments
 ENV MAX_JOBS=16

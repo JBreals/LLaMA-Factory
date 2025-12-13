@@ -39,7 +39,12 @@ def create_ui(demo_mode: bool = False) -> "gr.Blocks":
     engine = Engine(demo_mode=demo_mode, pure_chat=False)
     hostname = os.getenv("HOSTNAME", os.getenv("COMPUTERNAME", platform.node())).split(".")[0]
 
-    with gr.Blocks(title=f"LLaMA Factory ({hostname})", css=CSS) as demo:
+    pulse_css = (
+        ".pulse-dot { animation: pulse 1.2s infinite ease-in-out; display: inline-block; }\n"
+        "@keyframes pulse { 0% { opacity: 0.2; transform: scale(0.9);} "
+        "50% { opacity: 1; transform: scale(1.1);} 100% { opacity: 0.2; transform: scale(0.9);} }\n"
+    )
+    with gr.Blocks(title=f"LLaMA Factory ({hostname})", css=CSS + "\n" + pulse_css) as demo:
         title = gr.HTML()
         subtitle = gr.HTML()
         if demo_mode:
@@ -74,7 +79,7 @@ def create_web_demo() -> "gr.Blocks":
     engine = Engine(pure_chat=True)
     hostname = os.getenv("HOSTNAME", os.getenv("COMPUTERNAME", platform.node())).split(".")[0]
 
-    with gr.Blocks(title=f"LLaMA Factory Web Demo ({hostname})", css=CSS) as demo:
+    with gr.Blocks(title=f"LLaMA Factory Web Demo ({hostname})", css=CSS + "\n" + pulse_css) as demo:
         lang = gr.Dropdown(choices=["en", "ru", "zh", "ko", "ja"], scale=1)
         engine.manager.add_elems("top", dict(lang=lang))
 
