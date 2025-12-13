@@ -35,18 +35,18 @@ service:
   annotations: {}
 
 ingress:
-  enabled: false
+  enabled: true
   className: ""
   annotations: {}
   hosts:
-    - host: llamafactory.local
+    - host: llama-factory.quantumcns.ai
       paths:
         - path: /
           pathType: Prefix
           servicePort: webui
-        - path: /v1
-          pathType: Prefix
-          servicePort: api
+        # - path: /v1
+        #   pathType: Prefix
+        #   servicePort: api
   tls: []
 
 persistence:

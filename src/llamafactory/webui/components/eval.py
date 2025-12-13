@@ -36,13 +36,7 @@ def create_eval_tab(engine: "Engine") -> dict[str, "Component"]:
 
     with gr.Row():
         dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=2, interactive=True)
-        dataset = gr.Dropdown(
-            multiselect=True,
-            allow_custom_value=True,
-            scale=3,
-            placeholder="Dataset name or path (enter to add multiple)",
-            value=[],
-        )
+        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3, value=[])
         preview_elems = create_preview_box(dataset_dir, dataset)
 
     input_elems.update({dataset_dir, dataset})

@@ -43,13 +43,7 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
         stages = list(TRAINING_STAGES.keys())
         training_stage = gr.Dropdown(choices=stages, value=stages[0], scale=1)
         dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=1, interactive=True)
-        dataset = gr.Dropdown(
-            multiselect=True,
-            allow_custom_value=True,
-            scale=3,
-            placeholder="Dataset name or path (enter to add multiple)",
-            value=[],
-        )
+        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3, value=[])
         preview_elems = create_preview_box(dataset_dir, dataset)
 
     input_elems.update({training_stage, dataset_dir, dataset})
