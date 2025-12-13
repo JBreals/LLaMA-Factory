@@ -63,10 +63,11 @@ def create_top() -> dict[str, "Component"]:
         booster = gr.Dropdown(choices=["auto", "flashattn2", "unsloth", "liger_kernel"], value="auto")
 
     def _fill_model_info(name: str | None, hub: str, cur_path: str | None, cur_tmpl: str | None):
+        # On s3/custom, keep current path/template; otherwise fill from mapping
         if hub == "s3" or name not in available_models:
-            return gr.Textbox.update(value=cur_path), gr.Dropdown.update(value=cur_tmpl)
+            return gr.Textbox(value=cur_path), gr.Dropdown(value=cur_tmpl)
         path, tmpl = get_model_info(name)
-        return gr.Textbox.update(value=path), gr.Dropdown.update(value=tmpl)
+        return gr.Textbox(value=path), gr.Dropdown(value=tmpl)
 
     model_name.change(_fill_model_info, [model_name, hub_name, model_path, template], [model_path, template], queue=False).then(
         list_checkpoints, [model_name, finetuning_type], [checkpoint_path], queue=False
@@ -98,17 +99,11 @@ def create_top() -> dict[str, "Component"]:
                 cleaned = m_path.rstrip("/")
                 leaf = cleaned.split("/")[-1] if cleaned else ""
             txt_val = n_txt or leaf or (n_sel if n_sel not in available_models else "")
-            return (
-                gr.Dropdown.update(visible=False, value=None),
-                gr.Textbox.update(visible=True, value=txt_val),
-            )
+            return (gr.Dropdown(visible=False, value=None), gr.Textbox(visible=True, value=txt_val))
         safe_val = (
             n_sel if n_sel in available_models else ("Custom" if "Custom" in available_models else available_models[0])
         )
-        return (
-            gr.Dropdown.update(visible=True, value=safe_val),
-            gr.Textbox.update(visible=False, value=n_txt),
-        )
+        return (gr.Dropdown(visible=True, value=safe_val), gr.Textbox(visible=False, value=n_txt))
 
     hub_name.change(
         _toggle_model_input, [hub_name, model_name, model_name_text, model_path], [model_name, model_name_text], queue=False
