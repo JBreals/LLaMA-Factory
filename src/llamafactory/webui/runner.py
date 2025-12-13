@@ -36,6 +36,7 @@ from .common import (
     load_eval_results,
     save_args,
     save_cmd,
+    normalize_model_path,
 )
 from .control import get_trainer_info
 from .locales import ALERTS, LOCALES
@@ -74,9 +75,12 @@ class Runner:
     def _initialize(self, data: dict["Component", Any], do_train: bool, from_preview: bool) -> str:
         r"""Validate the configuration."""
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
-        lang, model_name, model_path = get("top.lang"), get("top.model_name"), get("top.model_path")
+        lang = get("top.lang")
+        hub_name = get("top.hub_name")
+        model_name = self._resolve_model_name(get, hub_name)
+        model_path = get("top.model_path")
         dataset = get("train.dataset") if do_train else get("eval.dataset")
-        custom_dataset = get("train.custom_dataset_path") if do_train else get("eval.custom_dataset_path")
+        custom_dataset = None
 
         if self.running:
             return ALERTS["err_conflict"][lang]
@@ -87,7 +91,7 @@ class Runner:
         if not model_path:
             return ALERTS["err_no_path"][lang]
 
-        if not dataset and not custom_dataset:
+        if not dataset:
             return ALERTS["err_no_dataset"][lang]
 
         if not from_preview and self.demo_mode:
@@ -124,21 +128,23 @@ class Runner:
         self.running_data = None
         torch_gc()
 
+    def _resolve_model_name(self, getter, hub_name: str):
+        sel = getter("top.model_name")
+        txt = getter("top.model_name_text")
+        if hub_name == "s3":
+            return txt or sel
+        return sel or txt
+
     def _parse_train_args(self, data: dict["Component", Any]) -> dict[str, Any]:
         r"""Build and validate the training arguments."""
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
-        model_name, finetuning_type = get("top.model_name"), get("top.finetuning_type")
+        hub_name = get("top.hub_name")
+        model_name = self._resolve_model_name(get, hub_name)
+        finetuning_type = get("top.finetuning_type")
+        model_path = normalize_model_path(get("top.model_path"), hub_name)
+        data_source = get("top.data_source")
         user_config = load_config()
 
-        custom_dataset_path = get("train.custom_dataset_path")
-        if isinstance(custom_dataset_path, list):
-            custom_datasets = [x.strip() for x in custom_dataset_path if isinstance(x, str) and x.strip()]
-        elif isinstance(custom_dataset_path, str):
-            custom_datasets = [
-                x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()
-            ]
-        else:
-            custom_datasets = []
         # resolve output dir prefix
         raw_output_dir = get("train.output_dir")
         if raw_output_dir and not os.path.isabs(raw_output_dir):
@@ -151,7 +157,7 @@ class Runner:
         args = dict(
             stage=TRAINING_STAGES[get("train.training_stage")],
             do_train=True,
-            model_name_or_path=get("top.model_path"),
+            model_name_or_path=model_path,
             cache_dir=user_config.get("cache_dir", None),
             preprocessing_num_workers=16,
             finetuning_type=finetuning_type,
@@ -195,6 +201,17 @@ class Runner:
             ddp_timeout=180000000,
             include_num_input_tokens_seen=True,
         )
+        dataset_list = [x for x in get("train.dataset") if x]
+        if data_source == "s3":
+            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(dataset_list)}
+            args["dataset_dir"] = ds_dir_dict
+            args["dataset"] = ",".join(ds_dir_dict.keys())
+        elif data_source == "huggingface":
+            args["dataset_dir"] = get("train.dataset_dir")
+            args["dataset"] = ",".join(dataset_list)
+        else:
+            args["dataset_dir"] = get("train.dataset_dir")
+            args["dataset"] = ",".join(dataset_list)
         report_to = args["report_to"]
         report_to_list = report_to if isinstance(report_to, list) else [report_to]
         mlflow_experiment = get("train.mlflow_experiment")
@@ -305,16 +322,6 @@ class Runner:
             args["swanlab_api_key"] = get("train.swanlab_api_key")
             args["swanlab_mode"] = get("train.swanlab_mode")
 
-        # custom dataset (cloud)
-        if custom_datasets:
-            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(custom_datasets)}
-            args["dataset_dir"] = ds_dir_dict
-            ds_names = [f"custom_cloud_{i}" for i in range(len(custom_datasets))]
-            if args["dataset"]:
-                args["dataset"] += "," + ",".join(ds_names)
-            else:
-                args["dataset"] = ",".join(ds_names)
-
         # eval config
         if get("train.val_size") > 1e-6 and args["stage"] != "ppo":
             args["val_size"] = get("train.val_size")
@@ -333,17 +340,12 @@ class Runner:
     def _parse_eval_args(self, data: dict["Component", Any]) -> dict[str, Any]:
         r"""Build and validate the evaluation arguments."""
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
-        model_name, finetuning_type = get("top.model_name"), get("top.finetuning_type")
+        hub_name = get("top.hub_name")
+        model_name = self._resolve_model_name(get, hub_name)
+        finetuning_type = get("top.finetuning_type")
+        data_source = get("top.data_source")
+        model_path = normalize_model_path(get("top.model_path"), hub_name)
         user_config = load_config()
-        custom_dataset_path = get("eval.custom_dataset_path")
-        if isinstance(custom_dataset_path, list):
-            custom_datasets = [x.strip() for x in custom_dataset_path if isinstance(x, str) and x.strip()]
-        elif isinstance(custom_dataset_path, str):
-            custom_datasets = [
-                x.strip() for part in custom_dataset_path.splitlines() for x in part.split(",") if x.strip()
-            ]
-        else:
-            custom_datasets = []
 
         raw_output_dir = get("eval.output_dir")
         if raw_output_dir and not os.path.isabs(raw_output_dir):
@@ -355,7 +357,7 @@ class Runner:
 
         args = dict(
             stage="sft",
-            model_name_or_path=get("top.model_path"),
+            model_name_or_path=model_path,
             cache_dir=user_config.get("cache_dir", None),
             preprocessing_num_workers=16,
             finetuning_type=finetuning_type,
@@ -379,14 +381,17 @@ class Runner:
             ddp_timeout=180000000,
         )
 
-        if custom_datasets:
-            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(custom_datasets)}
+        dataset_list = [x for x in get("eval.dataset") if x]
+        if data_source == "s3":
+            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(dataset_list)}
             args["dataset_dir"] = ds_dir_dict
-            ds_names = [f"custom_cloud_{i}" for i in range(len(custom_datasets))]
-            if args["eval_dataset"]:
-                args["eval_dataset"] += "," + ",".join(ds_names)
-            else:
-                args["eval_dataset"] = ",".join(ds_names)
+            args["eval_dataset"] = ",".join(ds_dir_dict.keys())
+        elif data_source == "huggingface":
+            args["dataset_dir"] = get("eval.dataset_dir")
+            args["eval_dataset"] = ",".join(dataset_list)
+        else:
+            args["dataset_dir"] = get("eval.dataset_dir")
+            args["eval_dataset"] = ",".join(dataset_list)
 
         if get("eval.predict"):
             args["do_predict"] = True

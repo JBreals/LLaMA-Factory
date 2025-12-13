@@ -19,7 +19,15 @@ from ...extras.constants import METHODS, SUPPORTED_MODELS
 from ...extras.misc import use_modelscope, use_openmind
 from ...extras.packages import is_gradio_available
 from ..common import save_config
-from ..control import can_quantize, can_quantize_to, check_template, get_model_info, list_checkpoints, switch_hub
+from ..control import (
+    can_quantize,
+    can_quantize_to,
+    check_template,
+    get_model_info,
+    list_checkpoints,
+    switch_hub,
+    suggest_model_name,
+)
 
 
 if is_gradio_available():
@@ -35,9 +43,13 @@ def create_top() -> dict[str, "Component"]:
         lang = gr.Dropdown(choices=["en", "ru", "zh", "ko", "ja"], value=None, scale=1)
         available_models = list(SUPPORTED_MODELS.keys()) + ["Custom"]
         model_name = gr.Dropdown(choices=available_models, value=None, scale=2)
+        model_name_text = gr.Textbox(
+            scale=2, placeholder="Model name (s3에서 비우면 경로 끝 이름으로 자동 설정)", visible=False
+        )
         model_path = gr.Textbox(scale=2)
         default_hub = "modelscope" if use_modelscope() else "openmind" if use_openmind() else "huggingface"
-        hub_name = gr.Dropdown(choices=["huggingface", "modelscope", "openmind"], value=default_hub, scale=2)
+        hub_name = gr.Dropdown(choices=["huggingface", "modelscope", "openmind", "s3"], value=default_hub, scale=2)
+        data_source = gr.Dropdown(choices=["local", "huggingface", "s3"], value="local", scale=1)
 
     with gr.Row():
         finetuning_type = gr.Dropdown(choices=METHODS, value="lora", scale=1)
@@ -54,7 +66,9 @@ def create_top() -> dict[str, "Component"]:
         list_checkpoints, [model_name, finetuning_type], [checkpoint_path], queue=False
     ).then(check_template, [lang, template])
     model_name.input(save_config, inputs=[lang, hub_name, model_name], queue=False)
+    model_name_text.input(save_config, inputs=[lang, hub_name, model_name_text], queue=False)
     model_path.input(save_config, inputs=[lang, hub_name, model_name, model_path], queue=False)
+    model_path.change(suggest_model_name, [hub_name, model_path, model_name_text, model_name], [model_name_text], queue=False)
     finetuning_type.change(can_quantize, [finetuning_type], [quantization_bit], queue=False).then(
         list_checkpoints, [model_name, finetuning_type], [checkpoint_path], queue=False
     )
@@ -64,14 +78,29 @@ def create_top() -> dict[str, "Component"]:
         get_model_info, [model_name], [model_path, template], queue=False
     ).then(list_checkpoints, [model_name, finetuning_type], [checkpoint_path], queue=False).then(
         check_template, [lang, template]
+    ).then(
+        suggest_model_name, [hub_name, model_path, model_name_text, model_name], [model_name_text], queue=False
     )
     hub_name.input(save_config, inputs=[lang, hub_name], queue=False)
+    data_source.input(save_config, inputs=[lang], queue=False)
+    hub_name.change(
+        lambda h, n_sel, n_txt: (
+            gr.Dropdown(visible=(h != "s3"), value=n_sel if h != "s3" else n_sel),
+            gr.Textbox(visible=(h == "s3"), value=n_txt if h == "s3" else n_txt),
+        ),
+        [hub_name, model_name, model_name_text],
+        [model_name, model_name_text],
+        queue=False,
+    )
+    model_name_text.change(lambda x: x, [model_name_text], [model_name], queue=False)
 
     return dict(
         lang=lang,
         model_name=model_name,
+        model_name_text=model_name_text,
         model_path=model_path,
         hub_name=hub_name,
+        data_source=data_source,
         finetuning_type=finetuning_type,
         checkpoint_path=checkpoint_path,
         quantization_bit=quantization_bit,

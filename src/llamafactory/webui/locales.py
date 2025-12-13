@@ -150,6 +150,28 @@ LOCALES = {
             "info": "モデルをダウンロードするためのソースを選択してください。",
         },
     },
+    "data_source": {
+        "en": {
+            "label": "Data source",
+            "info": "Select where datasets are loaded from (local/huggingface/s3).",
+        },
+        "ru": {
+            "label": "Источник данных",
+            "info": "Выберите источник датасетов (local/huggingface/s3).",
+        },
+        "zh": {
+            "label": "数据源",
+            "info": "选择数据集来源（local/huggingface/s3）。",
+        },
+        "ko": {
+            "label": "데이터 소스",
+            "info": "데이터셋을 불러올 위치를 선택하세요 (local/huggingface/s3).",
+        },
+        "ja": {
+            "label": "データソース",
+            "info": "データセットの取得先を選択します（local/huggingface/s3）。",
+        },
+    },
     "finetuning_type": {
         "en": {
             "label": "Finetuning method",

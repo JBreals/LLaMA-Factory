@@ -24,7 +24,7 @@ from ...extras.constants import PEFT_METHODS
 from ...extras.misc import torch_gc
 from ...extras.packages import is_gradio_available
 from ...train.tuner import export_model
-from ..common import get_save_dir, load_config
+from ..common import get_save_dir, load_config, normalize_model_path
 from ..locales import ALERTS
 
 
@@ -51,6 +51,7 @@ def can_quantize(checkpoint_path: Union[str, list[str]]) -> "gr.Dropdown":
 def save_model(
     lang: str,
     model_name: str,
+    hub_name: str,
     model_path: str,
     finetuning_type: str,
     checkpoint_path: Union[str, list[str]],
@@ -66,18 +67,30 @@ def save_model(
 ) -> Generator[str, None, None]:
     user_config = load_config()
     error = ""
-    is_s3_export = isinstance(export_dir, str) and export_dir.startswith("s3://")
-    upload_target = export_dir if is_s3_export else None
+    model_path = normalize_model_path(model_path, hub_name)
+    user_export_dir = export_dir
+    upload_target = None
+    is_s3_export = False
+    if isinstance(user_export_dir, str):
+        if user_export_dir.startswith("s3://"):
+            upload_target = user_export_dir
+            is_s3_export = True
+        elif hub_name == "s3":
+            upload_target = "s3://" + user_export_dir.lstrip("/")
+            is_s3_export = True
+
     if is_s3_export:
         export_tmp_root = os.getenv("EXPORT_TMP_ROOT", "/app/storage/exports")
         os.makedirs(export_tmp_root, exist_ok=True)
         export_dir = tempfile.mkdtemp(prefix="export_", dir=export_tmp_root)
+    else:
+        export_dir = user_export_dir
 
     if not model_name:
         error = ALERTS["err_no_model"][lang]
     elif not model_path:
         error = ALERTS["err_no_path"][lang]
-    elif not export_dir:
+    elif not user_export_dir:
         error = ALERTS["err_no_export_dir"][lang]
     elif export_quantization_bit in GPTQ_BITS and not export_quantization_dataset:
         error = ALERTS["err_no_dataset"][lang]
@@ -187,6 +200,7 @@ def create_export_tab(engine: "Engine") -> dict[str, "Component"]:
         [
             engine.manager.get_elem_by_id("top.lang"),
             engine.manager.get_elem_by_id("top.model_name"),
+            engine.manager.get_elem_by_id("top.hub_name"),
             engine.manager.get_elem_by_id("top.model_path"),
             engine.manager.get_elem_by_id("top.finetuning_type"),
             engine.manager.get_elem_by_id("top.checkpoint_path"),

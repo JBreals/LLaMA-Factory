@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 from ...extras.packages import is_gradio_available
 from ..common import DEFAULT_DATA_DIR
-from ..control import list_datasets
+from ..control import list_datasets, toggle_dataset_dir
 from .data import create_preview_box
 
 
@@ -35,21 +35,18 @@ def create_eval_tab(engine: "Engine") -> dict[str, "Component"]:
     elem_dict = dict()
 
     with gr.Row():
-        dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=2)
-        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3)
-        custom_dataset_path = gr.Dropdown(
+        dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=2, interactive=True)
+        dataset = gr.Dropdown(
             multiselect=True,
             allow_custom_value=True,
             scale=3,
+            placeholder="Dataset name or path (enter to add multiple)",
             value=[],
-            placeholder="Optional: s3://bucket/path (엔터로 여러 개 추가)",
         )
         preview_elems = create_preview_box(dataset_dir, dataset)
 
-    input_elems.update({dataset_dir, dataset, custom_dataset_path})
-    elem_dict.update(
-        dict(dataset_dir=dataset_dir, dataset=dataset, custom_dataset_path=custom_dataset_path, **preview_elems)
-    )
+    input_elems.update({dataset_dir, dataset})
+    elem_dict.update(dict(dataset_dir=dataset_dir, dataset=dataset, **preview_elems))
 
     with gr.Row():
         cutoff_len = gr.Slider(minimum=4, maximum=131072, value=1024, step=1)
@@ -99,5 +96,7 @@ def create_eval_tab(engine: "Engine") -> dict[str, "Component"]:
     resume_btn.change(engine.runner.monitor, outputs=output_elems, concurrency_limit=None)
 
     dataset.focus(list_datasets, [dataset_dir], [dataset], queue=False)
+    data_source = engine.manager.get_elem_by_id("top.data_source")
+    data_source.change(toggle_dataset_dir, [data_source], [dataset_dir], queue=False)
 
     return elem_dict

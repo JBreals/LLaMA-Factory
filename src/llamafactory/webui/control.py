@@ -47,6 +47,25 @@ def switch_hub(hub_name: str) -> None:
     os.environ["USE_OPENMIND_HUB"] = "1" if hub_name == "openmind" else "0"
 
 
+def toggle_dataset_dir(data_source: str) -> "gr.Textbox":
+    r"""Disable dataset_dir when using s3 source."""
+    return gr.Textbox(interactive=(data_source != "s3"))
+
+
+def suggest_model_name(
+    hub_name: str, model_path: str, model_name_text: str | None = None, model_name_select: str | None = None
+) -> "gr.Textbox":
+    r"""If hub is s3 and model_name is empty, use leaf name from model_path."""
+    current = model_name_text or model_name_select or ""
+    if hub_name == "s3" and (current is None or str(current).strip() == ""):
+        leaf = ""
+        if model_path:
+            cleaned = model_path.rstrip("/")
+            leaf = cleaned.split("/")[-1] if cleaned else ""
+        return gr.Textbox(value=leaf)
+    return gr.Textbox(value=current)
+
+
 def can_quantize(finetuning_type: str) -> "gr.Dropdown":
     r"""Judge if the quantization is available in this finetuning type.
 

@@ -122,6 +122,13 @@ def get_model_path(model_name: str) -> str:
     return model_path
 
 
+def normalize_model_path(path: str, hub_name: str) -> str:
+    r"""Normalize model path by hub source, e.g., prepend s3:// when hub is s3."""
+    if hub_name == "s3" and path and not path.startswith("s3://"):
+        return "s3://" + path.lstrip("/")
+    return path
+
+
 def get_template(model_name: str) -> str:
     r"""Get the template name if the model is a chat/distill/instruct model."""
     return DEFAULT_TEMPLATE.get(model_name, "default")

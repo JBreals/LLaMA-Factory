@@ -21,7 +21,7 @@ from ...extras.constants import TRAINING_STAGES
 from ...extras.misc import get_device_count
 from ...extras.packages import is_gradio_available
 from ..common import DEFAULT_DATA_DIR
-from ..control import change_stage, list_checkpoints, list_config_paths, list_datasets, list_output_dirs
+from ..control import change_stage, list_checkpoints, list_config_paths, list_datasets, list_output_dirs, toggle_dataset_dir
 from .data import create_preview_box
 
 
@@ -42,27 +42,18 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
     with gr.Row():
         stages = list(TRAINING_STAGES.keys())
         training_stage = gr.Dropdown(choices=stages, value=stages[0], scale=1)
-        dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=1)
-        dataset = gr.Dropdown(multiselect=True, allow_custom_value=True, scale=3)
-        custom_dataset_path = gr.Dropdown(
+        dataset_dir = gr.Textbox(value=DEFAULT_DATA_DIR, scale=1, interactive=True)
+        dataset = gr.Dropdown(
             multiselect=True,
             allow_custom_value=True,
             scale=3,
+            placeholder="Dataset name or path (enter to add multiple)",
             value=[],
-            placeholder="Optional: s3://bucket/path (엔터로 여러 개 추가)",
         )
         preview_elems = create_preview_box(dataset_dir, dataset)
 
-    input_elems.update({training_stage, dataset_dir, dataset, custom_dataset_path})
-    elem_dict.update(
-        dict(
-            training_stage=training_stage,
-            dataset_dir=dataset_dir,
-            dataset=dataset,
-            custom_dataset_path=custom_dataset_path,
-            **preview_elems,
-        )
-    )
+    input_elems.update({training_stage, dataset_dir, dataset})
+    elem_dict.update(dict(training_stage=training_stage, dataset_dir=dataset_dir, dataset=dataset, **preview_elems))
 
     with gr.Row():
         learning_rate = gr.Textbox(value="5e-5")
@@ -451,6 +442,8 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
     )
 
     dataset.focus(list_datasets, [dataset_dir, training_stage], [dataset], queue=False)
+    data_source = engine.manager.get_elem_by_id("top.data_source")
+    data_source.change(toggle_dataset_dir, [data_source], [dataset_dir], queue=False)
     training_stage.change(change_stage, [training_stage], [dataset, packing], queue=False)
     reward_model.focus(list_checkpoints, [model_name, finetuning_type], [reward_model], queue=False)
     model_name.change(list_output_dirs, [model_name, finetuning_type, current_time], [output_dir], queue=False)
