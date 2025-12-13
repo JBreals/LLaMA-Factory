@@ -73,6 +73,10 @@ extraEnv:
     value: /app/storage/hf_home/datasets
   - name: MLFLOW_HOME
     value: /app/storage/mlruns
+  - name: LLAMABOARD_OUTPUT_ROOT
+    value: /app/storage/outputs
+  - name: LLAMABOARD_EXPORT_ROOT
+    value: /app/storage/exports
   # S3 endpoint & credentials (set values or override via your values file)
   - name: AWS_ACCESS_KEY_ID
     value: ""

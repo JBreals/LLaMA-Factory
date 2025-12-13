@@ -39,7 +39,8 @@ logger = logging.get_logger(__name__)
 DEFAULT_CACHE_DIR = "llamaboard_cache"
 DEFAULT_CONFIG_DIR = "llamaboard_config"
 DEFAULT_DATA_DIR = "data"
-DEFAULT_SAVE_DIR = "saves"
+DEFAULT_SAVE_DIR = os.getenv("LLAMABOARD_OUTPUT_ROOT", "saves")
+DEFAULT_EXPORT_ROOT = os.getenv("LLAMABOARD_EXPORT_ROOT")
 USER_CONFIG = "user_config.yaml"
 
 

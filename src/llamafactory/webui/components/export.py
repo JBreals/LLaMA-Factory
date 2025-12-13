@@ -24,7 +24,7 @@ from ...extras.constants import PEFT_METHODS
 from ...extras.misc import torch_gc
 from ...extras.packages import is_gradio_available
 from ...train.tuner import export_model
-from ..common import get_save_dir, load_config, normalize_model_path
+from ..common import DEFAULT_EXPORT_ROOT, get_save_dir, load_config, normalize_model_path
 from ..locales import ALERTS
 
 
@@ -84,7 +84,10 @@ def save_model(
         os.makedirs(export_tmp_root, exist_ok=True)
         export_dir = tempfile.mkdtemp(prefix="export_", dir=export_tmp_root)
     else:
-        export_dir = user_export_dir
+        if user_export_dir and not os.path.isabs(user_export_dir) and DEFAULT_EXPORT_ROOT:
+            export_dir = os.path.join(DEFAULT_EXPORT_ROOT, user_export_dir)
+        else:
+            export_dir = user_export_dir
 
     if not model_name:
         error = ALERTS["err_no_model"][lang]
