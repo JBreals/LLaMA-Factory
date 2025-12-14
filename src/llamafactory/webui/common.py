@@ -76,7 +76,8 @@ def load_config() -> dict[str, Union[str, dict[str, Any]]]:
     r"""Load user config if exists."""
     try:
         with open(_get_config_path(), encoding="utf-8") as f:
-            return safe_load(f)
+            cfg = safe_load(f)
+            return cfg if cfg else {"lang": None, "hub_name": None, "last_model": None, "path_dict": {}, "cache_dir": None, "data_source": None}
     except Exception:
         return {"lang": None, "hub_name": None, "last_model": None, "path_dict": {}, "cache_dir": None, "data_source": None}
 
@@ -90,7 +91,10 @@ def save_config(
 ) -> None:
     r"""Save user config."""
     os.makedirs(DEFAULT_CACHE_DIR, exist_ok=True)
-    user_config = load_config()
+    user_config = load_config() or {"lang": None, "hub_name": None, "last_model": None, "path_dict": {}, "cache_dir": None, "data_source": None}
+    if not isinstance(user_config, dict):
+        user_config = {"lang": None, "hub_name": None, "last_model": None, "path_dict": {}, "cache_dir": None, "data_source": None}
+    user_config.setdefault("path_dict", {})
     user_config["lang"] = lang or user_config["lang"]
     if hub_name:
         user_config["hub_name"] = hub_name
@@ -109,9 +113,12 @@ def save_config(
 
 def get_model_path(model_name: str) -> str:
     r"""Get the model path according to the model name."""
-    user_config = load_config()
+    user_config = load_config() or {}
+    path_dict_cache = user_config.get("path_dict") or {}
+    if not isinstance(path_dict_cache, dict):
+        path_dict_cache = {}
     path_dict: dict[DownloadSource, str] = SUPPORTED_MODELS.get(model_name, defaultdict(str))
-    model_path = user_config["path_dict"].get(model_name, "") or path_dict.get(DownloadSource.DEFAULT, "")
+    model_path = path_dict_cache.get(model_name, "") or path_dict.get(DownloadSource.DEFAULT, "")
     if (
         use_modelscope()
         and path_dict.get(DownloadSource.MODELSCOPE)

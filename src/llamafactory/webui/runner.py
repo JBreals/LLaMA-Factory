@@ -152,7 +152,9 @@ class Runner:
             raise ValueError("S3 URI must include a key prefix, e.g. s3://bucket/model_dir")
 
         target_root = os.getenv("MODEL_DOWNLOAD_DIR", "/app/storage/models")
-        target_dir = os.path.join(target_root, prefix)
+        # Normalize prefix to avoid accidentally matching sibling prefixes (e.g., mistral-7b vs mistral-7b-finance)
+        normalized_prefix = prefix.rstrip("/") + "/"
+        target_dir = os.path.join(target_root, prefix.rstrip("/"))
         os.makedirs(target_dir, exist_ok=True)
         complete_marker = os.path.join(target_dir, ".complete")
 
@@ -169,13 +171,16 @@ class Runner:
         paginator = s3.get_paginator("list_objects_v2")
         found = False
         remote_files: list[tuple[str, int]] = []
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for page in paginator.paginate(Bucket=bucket, Prefix=normalized_prefix):
             for obj in page.get("Contents", []):
                 if obj["Key"].endswith("/"):
                     continue
+                # Skip keys that only share a prefix prefix (e.g., mistral-7b-finance)
+                if not obj["Key"].startswith(normalized_prefix):
+                    continue
                 found = True
                 remote_files.append((obj["Key"], obj["Size"]))
-                rel_path = obj["Key"][len(prefix):].lstrip("/")
+                rel_path = obj["Key"][len(normalized_prefix) :].lstrip("/")
                 local_path = os.path.join(target_dir, rel_path)
                 os.makedirs(os.path.dirname(local_path), exist_ok=True)
                 # Download only if missing or size mismatch
@@ -281,7 +286,10 @@ class Runner:
         )
         dataset_list = [x for x in get("train.dataset") if x]
         if data_source == "s3":
-            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(dataset_list)}
+            ds_dir_dict = {
+                f"custom_cloud_{i}": {"cloud_file_name": normalize_model_path(path, "s3")}
+                for i, path in enumerate(dataset_list)
+            }
             args["dataset_dir"] = ds_dir_dict
             args["dataset"] = ",".join(ds_dir_dict.keys())
         elif data_source == "huggingface":
@@ -456,7 +464,10 @@ class Runner:
 
         dataset_list = [x for x in get("eval.dataset") if x]
         if data_source == "s3":
-            ds_dir_dict = {f"custom_cloud_{i}": {"cloud_file_name": path} for i, path in enumerate(dataset_list)}
+            ds_dir_dict = {
+                f"custom_cloud_{i}": {"cloud_file_name": normalize_model_path(path, "s3")}
+                for i, path in enumerate(dataset_list)
+            }
             args["dataset_dir"] = ds_dir_dict
             args["eval_dataset"] = ",".join(ds_dir_dict.keys())
         elif data_source == "huggingface":
@@ -523,6 +534,8 @@ class Runner:
             yield {output_box: error}
         else:
             self.do_train, self.running_data = do_train, data
+            prep_msg = "Preparing model/data (downloading from S3 if needed)..."
+            yield {output_box: prep_msg}
             try:
                 args = (
                     self._parse_train_args(data, download_model=True)
@@ -538,6 +551,7 @@ class Runner:
                 gr.Warning(message)
                 yield {output_box: message}
                 return
+            yield {output_box: prep_msg + "\nPreparation finished. Launching..."}
 
             os.makedirs(args["output_dir"], exist_ok=True)
             save_args(os.path.join(args["output_dir"], LLAMABOARD_CONFIG), self._build_config_dict(data))
