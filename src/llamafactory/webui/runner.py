@@ -523,7 +523,21 @@ class Runner:
             yield {output_box: error}
         else:
             self.do_train, self.running_data = do_train, data
-            args = self._parse_train_args(data) if do_train else self._parse_eval_args(data)
+            try:
+                args = (
+                    self._parse_train_args(data, download_model=True)
+                    if do_train
+                    else self._parse_eval_args(data, download_model=True)
+                )
+                # Failsafe: if still s3://, force download and replace
+                model_path = args.get("model_name_or_path")
+                if isinstance(model_path, str) and model_path.startswith("s3://"):
+                    args["model_name_or_path"] = self._download_s3_model(model_path)
+            except Exception as exc:
+                message = f"Failed to prepare model or arguments: {exc}"
+                gr.Warning(message)
+                yield {output_box: message}
+                return
 
             os.makedirs(args["output_dir"], exist_ok=True)
             save_args(os.path.join(args["output_dir"], LLAMABOARD_CONFIG), self._build_config_dict(data))
