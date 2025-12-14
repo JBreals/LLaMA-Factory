@@ -18,6 +18,7 @@ from collections.abc import Generator
 from copy import deepcopy
 from subprocess import PIPE, Popen, TimeoutExpired
 from typing import TYPE_CHECKING, Any, Optional
+from urllib.parse import urlparse
 
 from transformers.utils import is_torch_npu_available
 
@@ -135,13 +136,90 @@ class Runner:
             return txt or sel
         return sel or txt
 
-    def _parse_train_args(self, data: dict["Component", Any]) -> dict[str, Any]:
+    def _download_s3_model(self, s3_uri: str) -> str:
+        r"""Download an S3-prefixed model to a local directory and return the path.
+
+        Adds basic integrity checks:
+        - If a .complete marker exists, reuse.
+        - Otherwise compare remote total size with local and re-download missing or mismatched files.
+        """
+        parsed = urlparse(s3_uri)
+        if parsed.scheme != "s3" or not parsed.netloc:
+            raise ValueError(f"Invalid S3 URI: {s3_uri}")
+        bucket = parsed.netloc
+        prefix = parsed.path.lstrip("/")
+        if not prefix:
+            raise ValueError("S3 URI must include a key prefix, e.g. s3://bucket/model_dir")
+
+        target_root = os.getenv("MODEL_DOWNLOAD_DIR", "/app/storage/models")
+        target_dir = os.path.join(target_root, prefix)
+        os.makedirs(target_dir, exist_ok=True)
+        complete_marker = os.path.join(target_dir, ".complete")
+
+        # If already exists with marker, reuse.
+        if os.path.isfile(complete_marker):
+            return target_dir
+
+        try:
+            import boto3
+        except ImportError as exc:
+            raise RuntimeError("boto3 is required for downloading models from S3.") from exc
+
+        s3 = boto3.client("s3")
+        paginator = s3.get_paginator("list_objects_v2")
+        found = False
+        remote_files: list[tuple[str, int]] = []
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                if obj["Key"].endswith("/"):
+                    continue
+                found = True
+                remote_files.append((obj["Key"], obj["Size"]))
+                rel_path = obj["Key"][len(prefix):].lstrip("/")
+                local_path = os.path.join(target_dir, rel_path)
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                # Download only if missing or size mismatch
+                if not os.path.isfile(local_path) or os.path.getsize(local_path) != obj["Size"]:
+                    s3.download_file(bucket, obj["Key"], local_path)
+
+        if not found:
+            raise RuntimeError(f"No objects found under s3://{bucket}/{prefix}")
+
+        # Verify sizes match
+        remote_total = sum(size for _, size in remote_files)
+        local_total = 0
+        for root, _, files in os.walk(target_dir):
+            for fname in files:
+                if fname == ".complete":
+                    continue
+                local_total += os.path.getsize(os.path.join(root, fname))
+
+        if local_total != remote_total:
+            # Remove marker if any and force re-download
+            if os.path.isfile(complete_marker):
+                os.remove(complete_marker)
+            for key, size in remote_files:
+                rel_path = key[len(prefix):].lstrip("/")
+                local_path = os.path.join(target_dir, rel_path)
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                if not os.path.isfile(local_path) or os.path.getsize(local_path) != size:
+                    s3.download_file(bucket, key, local_path)
+
+        # Mark completion
+        with open(complete_marker, "w", encoding="utf-8") as f:
+            f.write("ok")
+
+        return target_dir
+
+    def _parse_train_args(self, data: dict["Component", Any], download_model: bool = False) -> dict[str, Any]:
         r"""Build and validate the training arguments."""
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
         hub_name = get("top.hub_name")
         model_name = self._resolve_model_name(get, hub_name)
         finetuning_type = get("top.finetuning_type")
         model_path = normalize_model_path(get("top.model_path"), hub_name)
+        if download_model and hub_name == "s3":
+            model_path = self._download_s3_model(model_path)
         data_source = get("top.data_source")
         user_config = load_config()
 
@@ -330,7 +408,7 @@ class Runner:
 
         return args
 
-    def _parse_eval_args(self, data: dict["Component", Any]) -> dict[str, Any]:
+    def _parse_eval_args(self, data: dict["Component", Any], download_model: bool = False) -> dict[str, Any]:
         r"""Build and validate the evaluation arguments."""
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
         hub_name = get("top.hub_name")
@@ -338,6 +416,8 @@ class Runner:
         finetuning_type = get("top.finetuning_type")
         data_source = get("top.data_source")
         model_path = normalize_model_path(get("top.model_path"), hub_name)
+        if download_model and hub_name == "s3":
+            model_path = self._download_s3_model(model_path)
         user_config = load_config()
 
         raw_output_dir = get("eval.output_dir")
@@ -421,7 +501,17 @@ class Runner:
             gr.Warning(error)
             yield {output_box: error}
         else:
-            args = self._parse_train_args(data) if do_train else self._parse_eval_args(data)
+            try:
+                args = (
+                    self._parse_train_args(data, download_model=True)
+                    if do_train
+                    else self._parse_eval_args(data, download_model=True)
+                )
+            except Exception as exc:
+                message = f"Failed to prepare model or arguments: {exc}"
+                gr.Warning(message)
+                yield {output_box: message}
+                return
             yield {output_box: gen_cmd(args)}
 
     def _launch(self, data: dict["Component", Any], do_train: bool) -> Generator[dict["Component", Any], None, None]:

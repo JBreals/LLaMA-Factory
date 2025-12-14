@@ -77,6 +77,8 @@ extraEnv:
     value: /app/storage/outputs
   - name: LLAMABOARD_EXPORT_ROOT
     value: /app/storage/exports
+  - name: MODEL_DOWNLOAD_DIR
+    value: /app/storage/models
   # S3 endpoint & credentials (set values or override via your values file)
   - name: AWS_ACCESS_KEY_ID
     value: ""
