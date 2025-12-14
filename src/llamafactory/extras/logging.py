@@ -56,6 +56,10 @@ class LoggerHandler(logging.Handler):
         if record.name == "httpx":
             return
 
+        # Recreate the pool if it was shut down (e.g., after a previous run finished).
+        if getattr(self.thread_pool, "_shutdown", False):
+            self.thread_pool = ThreadPoolExecutor(max_workers=1)
+
         log_entry = self._formatter.format(record)
         self.thread_pool.submit(self._write_log, log_entry)
 
