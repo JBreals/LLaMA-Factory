@@ -177,7 +177,10 @@ def get_cloud_files(cloud_path: str) -> tuple[str, list[str]]:
         fs = setup_fs(cloud_path)
 
     if fs.isdir(cloud_path):
-        files = [p for p in fs.find(cloud_path) if fs.isfile(p)]
+        # fs.find returns protocol-stripped paths (e.g., bucket/key) for S3/GCS.
+        # Add the protocol back so downstream `datasets` treats them as remote URIs
+        # instead of local file paths like /app/<bucket>/<key>.
+        files = [fs.unstrip_protocol(p) for p in fs.find(cloud_path) if fs.isfile(p)]
     else:
         files = [cloud_path]
 
