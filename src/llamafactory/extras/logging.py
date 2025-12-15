@@ -61,7 +61,12 @@ class LoggerHandler(logging.Handler):
             self.thread_pool = ThreadPoolExecutor(max_workers=1)
 
         log_entry = self._formatter.format(record)
-        self.thread_pool.submit(self._write_log, log_entry)
+        try:
+            self.thread_pool.submit(self._write_log, log_entry)
+        except RuntimeError:
+            # The interpreter is tearing down and the pool was shut down between the check and submit.
+            self.thread_pool = ThreadPoolExecutor(max_workers=1)
+            self.thread_pool.submit(self._write_log, log_entry)
 
     def close(self) -> None:
         self.thread_pool.shutdown(wait=True)

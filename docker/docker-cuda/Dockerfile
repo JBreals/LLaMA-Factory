@@ -4,7 +4,7 @@ FROM ${BASE_IMAGE}
 
 # Installation arguments
 ARG PIP_INDEX=https://pypi.org/simple
-ARG EXTRAS=metrics
+ARG EXTRAS=bitsandbytes,gptqmodel,awq,aqlm,hqq
 ARG CONSTRAINTS_FILE="docker/constraints.extras.txt"
 ARG INSTALL_FLASHATTN=false
 ARG HTTP_PROXY=""
