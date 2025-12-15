@@ -17,6 +17,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from urllib.parse import urlparse
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Union
 
@@ -39,6 +40,21 @@ if TYPE_CHECKING:
 
 
 GPTQ_BITS = ["8", "4", "3", "2"]
+
+
+def _resolve_s3_local_model(path: str, model_name: str) -> str:
+    r"""Map an S3 model path to the local cache root (MODEL_DOWNLOAD_DIR)."""
+    cache_root = os.getenv("MODEL_DOWNLOAD_DIR", "/app/storage/models")
+    # Prefer the explicit model name, otherwise use the last segment of the path.
+    leaf = model_name
+    if not leaf:
+        parsed = urlparse(path) if path.startswith("s3://") else None
+        raw_path = parsed.path if parsed else path
+        leaf = raw_path.rstrip("/").split("/")[-1]
+    local_path = os.path.join(cache_root, leaf)
+    if not os.path.isdir(local_path):
+        raise ValueError(f"Local S3 model not found under {local_path}. Download it to MODEL_DOWNLOAD_DIR first.")
+    return local_path
 
 
 def can_quantize(checkpoint_path: Union[str, list[str]]) -> "gr.Dropdown":
@@ -68,6 +84,12 @@ def save_model(
     user_config = load_config()
     error = ""
     model_path = normalize_model_path(model_path, hub_name)
+    if hub_name == "s3" and model_path:
+        try:
+            model_path = _resolve_s3_local_model(model_path, model_name)
+        except Exception as exc:
+            error = str(exc)
+
     user_export_dir = export_dir
     upload_target = None
     is_s3_export = False

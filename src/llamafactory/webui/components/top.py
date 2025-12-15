@@ -18,7 +18,7 @@ from ...data import TEMPLATES
 from ...extras.constants import METHODS, SUPPORTED_MODELS
 from ...extras.misc import use_modelscope, use_openmind
 from ...extras.packages import is_gradio_available
-from ..common import save_config
+from ..common import load_config, save_config
 from ..control import (
     can_quantize,
     can_quantize_to,
@@ -28,6 +28,7 @@ from ..control import (
     switch_hub,
     suggest_model_name,
 )
+from ..locales import LOCALES
 
 
 if is_gradio_available():
@@ -42,9 +43,14 @@ def create_top() -> dict[str, "Component"]:
     with gr.Row():
         lang = gr.Dropdown(choices=["en", "ru", "zh", "ko", "ja"], value=None, scale=1)
         available_models = list(SUPPORTED_MODELS.keys()) + ["Custom"]
+        init_lang = (load_config() or {}).get("lang") or "en"
         model_name = gr.Dropdown(choices=available_models, value=None, scale=2, allow_custom_value=True)
         model_name_text = gr.Textbox(
-            scale=2, placeholder="Model name (s3에서 비우면 경로 끝 이름으로 자동 설정)", visible=False
+            label=LOCALES["model_name_text"][init_lang]["label"],
+            info=LOCALES["model_name_text"][init_lang]["info"],
+            placeholder=LOCALES["model_name_text"][init_lang]["placeholder"],
+            scale=2,
+            visible=False,
         )
         model_path = gr.Textbox(scale=2)
         default_hub = "modelscope" if use_modelscope() else "openmind" if use_openmind() else "huggingface"

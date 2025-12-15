@@ -136,7 +136,7 @@ class Runner:
             return txt or sel
         return sel or txt
 
-    def _download_s3_model(self, s3_uri: str) -> str:
+    def _download_s3_model(self, s3_uri: str, preferred_leaf: str | None = None) -> str:
         r"""Download an S3-prefixed model to a local directory and return the path.
 
         Adds basic integrity checks:
@@ -152,9 +152,16 @@ class Runner:
             raise ValueError("S3 URI must include a key prefix, e.g. s3://bucket/model_dir")
 
         target_root = os.getenv("MODEL_DOWNLOAD_DIR", "/app/storage/models")
+        # Prefer an explicit model name for the local directory; otherwise fall back to the S3 path leaf.
+        target_leaf = (preferred_leaf or "").strip()
+        if target_leaf:
+            target_leaf = target_leaf.rstrip("/").split("/")[-1]
+        if not target_leaf:
+            target_leaf = prefix.rstrip("/").split("/")[-1]
+
         # Normalize prefix to avoid accidentally matching sibling prefixes (e.g., mistral-7b vs mistral-7b-finance)
         normalized_prefix = prefix.rstrip("/") + "/"
-        target_dir = os.path.join(target_root, prefix.rstrip("/"))
+        target_dir = os.path.join(target_root, target_leaf)
         os.makedirs(target_dir, exist_ok=True)
         complete_marker = os.path.join(target_dir, ".complete")
 
@@ -224,7 +231,7 @@ class Runner:
         finetuning_type = get("top.finetuning_type")
         model_path = normalize_model_path(get("top.model_path"), hub_name)
         if download_model and hub_name == "s3":
-            model_path = self._download_s3_model(model_path)
+            model_path = self._download_s3_model(model_path, preferred_leaf=model_name)
         data_source = get("top.data_source")
         user_config = load_config()
 
@@ -425,7 +432,7 @@ class Runner:
         data_source = get("top.data_source")
         model_path = normalize_model_path(get("top.model_path"), hub_name)
         if download_model and hub_name == "s3":
-            model_path = self._download_s3_model(model_path)
+            model_path = self._download_s3_model(model_path, preferred_leaf=model_name)
         user_config = load_config()
 
         raw_output_dir = get("eval.output_dir")
@@ -545,7 +552,8 @@ class Runner:
                 # Failsafe: if still s3://, force download and replace
                 model_path = args.get("model_name_or_path")
                 if isinstance(model_path, str) and model_path.startswith("s3://"):
-                    args["model_name_or_path"] = self._download_s3_model(model_path)
+                    resolved_name = self._resolve_model_name(get, get("top.hub_name"))
+                    args["model_name_or_path"] = self._download_s3_model(model_path, preferred_leaf=resolved_name)
             except Exception as exc:
                 message = f"Failed to prepare model or arguments: {exc}"
                 gr.Warning(message)

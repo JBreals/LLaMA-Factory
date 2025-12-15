@@ -106,6 +106,33 @@ LOCALES = {
             "info": "モデルを検索するための初期名を入力してください。",
         },
     },
+    "model_name_text": {
+        "en": {
+            "label": "Model name",
+            "info": "Local folder name when using the S3 hub. Leave empty to auto-use the last path segment.",
+            "placeholder": "e.g., my-model (leave empty to auto-use path leaf)",
+        },
+        "ru": {
+            "label": "Название модели",
+            "info": "Имя локальной папки при использовании хаба S3. Оставьте пустым, чтобы взять последний сегмент пути.",
+            "placeholder": "например, my-model (пусто — использовать конец пути)",
+        },
+        "zh": {
+            "label": "模型名称",
+            "info": "使用 S3 hub 时的本地文件夹名。留空则自动使用模型路径的最后一段。",
+            "placeholder": "例：my-model（留空则自动使用路径结尾）",
+        },
+        "ko": {
+            "label": "모델 이름",
+            "info": "S3 허브 사용 시 로컬 폴더 이름. 비워두면 모델 경로의 마지막 세그먼트를 자동 사용합니다.",
+            "placeholder": "예: my-model (비우면 경로 leaf 자동 사용)",
+        },
+        "ja": {
+            "label": "モデル名",
+            "info": "S3 ハブ使用時のローカルフォルダ名。空欄ならパスの末尾を自動使用します。",
+            "placeholder": "例: my-model（空欄でパス末尾を自動使用）",
+        },
+    },
     "model_path": {
         "en": {
             "label": "Model path",
