@@ -83,18 +83,30 @@ def _load_single_dataset(
         data_files = []
         local_path = _resolve_local_path(dataset_attr.dataset_name)
         if os.path.isdir(local_path):  # is directory
-            for file_name in os.listdir(local_path):
-                data_files.append(os.path.join(local_path, file_name))
+            for file_name in sorted(os.listdir(local_path)):
+                file_path = os.path.join(local_path, file_name)
+                if not os.path.isfile(file_path):
+                    continue
+                ext = os.path.splitext(file_path)[-1][1:].lower()
+                if ext not in FILEEXT2TYPE:
+                    # ignore marker/hidden files such as .complete that are created by downloaders
+                    continue
+                data_files.append(file_path)
         elif os.path.isfile(local_path):  # is file
-            data_files.append(local_path)
+            ext = os.path.splitext(local_path)[-1][1:].lower()
+            if ext in FILEEXT2TYPE:
+                data_files.append(local_path)
         else:
             raise ValueError(f"File {local_path} not found.")
 
-        data_path = FILEEXT2TYPE.get(os.path.splitext(data_files[0])[-1][1:], None)
+        if not data_files:
+            raise ValueError(f"No supported data files found under {local_path}.")
+
+        data_path = FILEEXT2TYPE.get(os.path.splitext(data_files[0])[-1][1:].lower(), None)
         if data_path is None:
             raise ValueError("Allowed file types: {}.".format(",".join(FILEEXT2TYPE.keys())))
 
-        if any(data_path != FILEEXT2TYPE.get(os.path.splitext(data_file)[-1][1:], None) for data_file in data_files):
+        if any(data_path != FILEEXT2TYPE.get(os.path.splitext(data_file)[-1][1:].lower(), None) for data_file in data_files):
             raise ValueError("File types should be identical.")
     else:
         raise NotImplementedError(f"Unknown load type: {dataset_attr.load_from}.")
