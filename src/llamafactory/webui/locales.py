@@ -180,23 +180,23 @@ LOCALES = {
     "data_source": {
         "en": {
             "label": "Data source",
-            "info": "Select where datasets are loaded from (local/huggingface/s3).",
+            "info": "Select where datasets are loaded from (local/huggingface/s3/lakefs).",
         },
         "ru": {
             "label": "Источник данных",
-            "info": "Выберите источник датасетов (local/huggingface/s3).",
+            "info": "Выберите источник датасетов (local/huggingface/s3/lakefs).",
         },
         "zh": {
             "label": "数据源",
-            "info": "选择数据集来源（local/huggingface/s3）。",
+            "info": "选择数据集来源（local/huggingface/s3/lakefs）。",
         },
         "ko": {
             "label": "데이터 소스",
-            "info": "데이터셋을 불러올 위치를 선택하세요 (local/huggingface/s3).",
+            "info": "데이터셋을 불러올 위치를 선택하세요 (local/huggingface/s3/lakefs).",
         },
         "ja": {
             "label": "データソース",
-            "info": "データセットの取得先を選択します（local/huggingface/s3）。",
+            "info": "データセットの取得先を選択します（local/huggingface/s3/lakefs）。",
         },
     },
     "finetuning_type": {

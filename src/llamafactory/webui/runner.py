@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import json
 import os
+import shutil
 from collections.abc import Generator
 from copy import deepcopy
 from subprocess import PIPE, Popen, TimeoutExpired
+import subprocess
 from typing import TYPE_CHECKING, Any, Optional
 from urllib.parse import urlparse
 
@@ -223,6 +226,73 @@ class Runner:
 
         return target_dir
 
+    @staticmethod
+    def _normalize_lakefs_uri(uri: str) -> str:
+        r"""Ensure a lakeFS URI has the proper scheme/prefix."""
+        trimmed = (uri or "").strip()
+        if not trimmed:
+            return trimmed
+        if trimmed.startswith("lakefs://"):
+            return trimmed
+        return "lakefs://" + trimmed.lstrip("/")
+
+    def _download_lakefs_datasets(self, uris: list[str]) -> list[str]:
+        r"""Download lakeFS paths to a local cache directory and return local folders."""
+        if not uris:
+            return []
+
+        cache_root = os.getenv("LAKEFS_DATASET_DIR", "/app/storage/lakefs_datasets")
+        os.makedirs(cache_root, exist_ok=True)
+        binary = os.getenv("LAKECTL_BIN", "lakectl")
+        results: list[str] = []
+        for raw_uri in uris:
+            uri = self._normalize_lakefs_uri(raw_uri)
+            parsed = urlparse(uri)
+            if parsed.scheme != "lakefs" or not parsed.netloc:
+                raise ValueError(f"Invalid LakeFS URI: {uri}")
+            remainder = parsed.path.lstrip("/")
+            if not remainder:
+                raise ValueError(f"LakeFS URI must include branch and path, e.g. lakefs://repo/branch/path (got {uri}).")
+            branch, _, key = remainder.partition("/")
+            if not branch:
+                raise ValueError(f"LakeFS URI must include branch segment: {uri}.")
+
+            digest = hashlib.sha256(uri.encode("utf-8")).hexdigest()[:16]
+            target_dir = os.path.join(cache_root, parsed.netloc, branch, digest)
+            marker = os.path.join(target_dir, ".complete")
+
+            if os.path.isfile(marker):
+                results.append(target_dir)
+                continue
+
+            if os.path.isdir(target_dir):
+                shutil.rmtree(target_dir)
+            elif os.path.exists(target_dir):
+                os.remove(target_dir)
+            os.makedirs(target_dir, exist_ok=True)
+
+            try:
+                subprocess.run(
+                    [binary, "fs", "download", uri, target_dir],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except FileNotFoundError as exc:
+                raise RuntimeError("lakectl CLI not found. Install lakectl or choose another data source.") from exc
+            except subprocess.CalledProcessError as exc:
+                err_msg = exc.stderr.strip() or exc.stdout.strip() or str(exc)
+                raise RuntimeError(f"lakectl download failed for {uri}: {err_msg}") from exc
+
+            if not os.path.exists(target_dir):
+                raise RuntimeError(f"lakectl download did not produce {target_dir}")
+
+            with open(marker, "w", encoding="utf-8") as f:
+                f.write("ok")
+            results.append(target_dir)
+
+        return results
+
     def _parse_train_args(self, data: dict["Component", Any], download_model: bool = False) -> dict[str, Any]:
         r"""Build and validate the training arguments."""
         get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
@@ -297,6 +367,12 @@ class Runner:
                 f"custom_cloud_{i}": {"cloud_file_name": normalize_model_path(path, "s3")}
                 for i, path in enumerate(dataset_list)
             }
+            args["dataset_dir"] = ds_dir_dict
+            args["dataset"] = ",".join(ds_dir_dict.keys())
+        elif data_source == "lakefs":
+            normalized_paths = [self._normalize_lakefs_uri(path) for path in dataset_list]
+            local_dirs = self._download_lakefs_datasets(normalized_paths)
+            ds_dir_dict = {f"custom_lakefs_{i}": {"file_name": path} for i, path in enumerate(local_dirs)}
             args["dataset_dir"] = ds_dir_dict
             args["dataset"] = ",".join(ds_dir_dict.keys())
         elif data_source == "huggingface":
@@ -477,6 +553,12 @@ class Runner:
             }
             args["dataset_dir"] = ds_dir_dict
             args["eval_dataset"] = ",".join(ds_dir_dict.keys())
+        elif data_source == "lakefs":
+            normalized_paths = [self._normalize_lakefs_uri(path) for path in dataset_list]
+            local_dirs = self._download_lakefs_datasets(normalized_paths)
+            ds_dir_dict = {f"custom_lakefs_{i}": {"file_name": path} for i, path in enumerate(local_dirs)}
+            args["dataset_dir"] = ds_dir_dict
+            args["eval_dataset"] = ",".join(ds_dir_dict.keys())
         elif data_source == "huggingface":
             args["dataset_dir"] = get("eval.dataset_dir")
             args["eval_dataset"] = ",".join(dataset_list)
@@ -541,7 +623,7 @@ class Runner:
             yield {output_box: error}
         else:
             self.do_train, self.running_data = do_train, data
-            prep_msg = "Preparing model/data (downloading from S3 if needed)..."
+            prep_msg = "Preparing model/data (downloading remote sources if needed)..."
             yield {output_box: prep_msg}
             try:
                 args = (

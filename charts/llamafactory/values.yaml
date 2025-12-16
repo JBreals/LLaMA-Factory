@@ -97,6 +97,12 @@ extraEnv:
     value: ""
   - name: MLFLOW_TRACKING_PASSWORD
     value: ""
+  - name: LAKECTL_SERVER_ENDPOINT_URL
+    value: ""
+  - name: LAKECTL_CREDENTIALS_ACCESS_KEY_ID
+    value: ""
+  - name: LAKECTL_CREDENTIALS_SECRET_ACCESS_KEY
+    value: ""
 
 envFrom: []
 

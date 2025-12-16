@@ -55,7 +55,7 @@ def create_top() -> dict[str, "Component"]:
         model_path = gr.Textbox(scale=2)
         default_hub = "modelscope" if use_modelscope() else "openmind" if use_openmind() else "huggingface"
         hub_name = gr.Dropdown(choices=["huggingface", "modelscope", "openmind", "s3"], value=default_hub, scale=2)
-        data_source = gr.Dropdown(choices=["local", "huggingface", "s3"], value="local", scale=1)
+        data_source = gr.Dropdown(choices=["local", "huggingface", "s3", "lakefs"], value="local", scale=1)
 
     with gr.Row():
         finetuning_type = gr.Dropdown(choices=METHODS, value="lora", scale=1)

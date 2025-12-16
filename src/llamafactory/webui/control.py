@@ -48,8 +48,8 @@ def switch_hub(hub_name: str) -> None:
 
 
 def toggle_dataset_dir(data_source: str) -> "gr.Textbox":
-    r"""Disable dataset_dir when using s3 source."""
-    return gr.Textbox(interactive=(data_source != "s3"))
+    r"""Disable dataset_dir when using remote sources that bypass local configs."""
+    return gr.Textbox(interactive=(data_source not in {"s3", "lakefs"}))
 
 
 def suggest_model_name(

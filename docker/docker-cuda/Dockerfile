@@ -26,8 +26,9 @@ SHELL ["/bin/bash", "-c"]
 # Set the working directory
 WORKDIR /app
 
-# Change pip source
-RUN pip config set global.index-url "${PIP_INDEX}" && \
+# Change pip source and ensure system deps
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* && \
+    pip config set global.index-url "${PIP_INDEX}" && \
     pip config set global.extra-index-url "${PIP_INDEX}" && \
     pip install --no-cache-dir --upgrade pip packaging wheel setuptools
 
@@ -52,6 +53,18 @@ RUN if [ "${INSTALL_FLASHATTN}" == "true" ]; then \
         pip install --no-cache-dir ninja && \
         pip install --no-cache-dir flash-attn --no-build-isolation; \
     fi
+
+# Install lakectl CLI (configuration handled externally)
+RUN set -eux; \
+    curl -fsSL \
+      https://github.com/treeverse/lakeFS/releases/download/v1.73.0/lakeFS_1.73.0_Linux_x86_64.tar.gz \
+      -o /tmp/lakefs.tar.gz && \
+    tar -xzf /tmp/lakefs.tar.gz -C /tmp && \
+    ls -al /tmp && \
+    install -m 0755 /tmp/lakefs /usr/local/bin/lakefs && \
+    rm -rf /tmp/lakefs /tmp/lakefs.tar.gz && \
+    lakectl --help
+
 
 # Set up volumes
 # VOLUME [ "/root/.cache/huggingface", "/app/shared_data", "/app/output" ]
