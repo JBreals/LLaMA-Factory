@@ -55,16 +55,11 @@ RUN if [ "${INSTALL_FLASHATTN}" == "true" ]; then \
     fi
 
 # Install lakectl CLI (configuration handled externally)
-RUN set -eux; \
-    curl -fsSL \
-      https://github.com/treeverse/lakeFS/releases/download/v1.73.0/lakeFS_1.73.0_Linux_x86_64.tar.gz \
-      -o /tmp/lakefs.tar.gz && \
-    tar -xzf /tmp/lakefs.tar.gz -C /tmp && \
-    ls -al /tmp && \
-    install -m 0755 /tmp/lakefs /usr/local/bin/lakefs && \
-    rm -rf /tmp/lakefs /tmp/lakefs.tar.gz && \
+RUN curl -fsSL https://github.com/treeverse/lakeFS/releases/download/v1.73.0/lakeFS_1.73.0_Linux_x86_64.tar.gz -o /tmp/lakectl-linux-amd64.tar.gz && \
+    tar -xzf /tmp/lakectl-linux-amd64.tar.gz -C /tmp && \
+    install -m 0755 /tmp/lakectl /usr/local/bin/lakectl && \
+    rm -rf /tmp/lakectl /tmp/lakefs /tmp/lakectl-linux-amd64.tar.gz && \
     lakectl --help
-
 
 # Set up volumes
 # VOLUME [ "/root/.cache/huggingface", "/app/shared_data", "/app/output" ]
