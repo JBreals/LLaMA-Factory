@@ -3276,11 +3276,11 @@ ALERTS = {
         "ja": "✅ アップロード完了: ",
     },
     "err_export_upload_not_found": {
-        "en": "aws CLI not found. Install awscli or set a local export_dir.",
-        "ru": "aws CLI не найден. Установите awscli или используйте локальный export_dir.",
-        "zh": "未找到 aws CLI。请安装 awscli 或使用本地 export_dir。",
-        "ko": "aws CLI를 찾을 수 없습니다. awscli를 설치하거나 로컬 export_dir을 사용하세요.",
-        "ja": "aws CLI が見つかりません。awscli をインストールするかローカル export_dir を使用してください。",
+        "en": "boto3 not found. Install boto3 or set a local export_dir.",
+        "ru": "boto3 не найден. Установите boto3 или используйте локальный export_dir.",
+        "zh": "未找到 boto3。请安装 boto3 或使用本地 export_dir。",
+        "ko": "boto3를 찾을 수 없습니다. boto3를 설치하거나 로컬 export_dir을 사용하세요.",
+        "ja": "boto3 が見つかりません。boto3 をインストールするかローカル export_dir を使用してください。",
     },
     "err_export_upload_failed": {
         "en": "Upload to S3 failed.",

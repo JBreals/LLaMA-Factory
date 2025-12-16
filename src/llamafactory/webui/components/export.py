@@ -15,11 +15,10 @@
 import json
 import os
 import shutil
-import subprocess
 import tempfile
-from urllib.parse import urlparse
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Union
+from urllib.parse import urlparse
 
 from ...extras.constants import PEFT_METHODS
 from ...extras.misc import torch_gc
@@ -55,6 +54,48 @@ def _resolve_s3_local_model(path: str, model_name: str) -> str:
     if not os.path.isdir(local_path):
         raise ValueError(f"Local S3 model not found under {local_path}. Download it to MODEL_DOWNLOAD_DIR first.")
     return local_path
+
+
+def _parse_s3_uri(uri: str) -> tuple[str, str]:
+    r"""Return (bucket, prefix) from an s3:// URI."""
+    parsed = urlparse(uri)
+    if parsed.scheme != "s3" or not parsed.netloc:
+        raise ValueError(f"Invalid S3 URI: {uri}")
+    bucket = parsed.netloc
+    prefix = parsed.path.lstrip("/")
+    return bucket, prefix
+
+
+def _upload_directory_to_s3(local_dir: str, target_uri: str) -> None:
+    r"""Upload files under local_dir to the given s3:// URI using boto3."""
+    try:
+        import boto3
+        from boto3.s3.transfer import S3Transfer, TransferConfig
+        from botocore.exceptions import BotoCoreError, ClientError
+    except ImportError as exc:
+        raise ModuleNotFoundError("boto3 is required for uploading models to S3.") from exc
+
+    bucket, prefix = _parse_s3_uri(target_uri)
+    threshold = int(os.getenv("S3_MULTIPART_THRESHOLD", 64 * 1024 * 1024))
+    chunk_size = int(os.getenv("S3_MULTIPART_CHUNKSIZE", 64 * 1024 * 1024))
+    concurrency = int(os.getenv("S3_MAX_CONCURRENCY", 16))
+    config = TransferConfig(
+        multipart_threshold=threshold,
+        multipart_chunksize=chunk_size,
+        max_concurrency=max(1, concurrency),
+        use_threads=True,
+    )
+    transfer = S3Transfer(boto3.client("s3"), config)
+
+    try:
+        for root, _, files in os.walk(local_dir):
+            for name in files:
+                local_path = os.path.join(root, name)
+                rel_key = os.path.relpath(local_path, local_dir).replace(os.sep, "/")
+                s3_key = f"{prefix.rstrip('/')}/{rel_key}" if prefix else rel_key
+                transfer.upload_file(local_path, bucket, s3_key)
+    except (BotoCoreError, ClientError) as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def can_quantize(checkpoint_path: Union[str, list[str]]) -> "gr.Dropdown":
@@ -175,20 +216,15 @@ def save_model(
     if is_s3_export:
         try:
             yield ALERTS["info_export_uploading"][lang] + upload_target
-            completed = subprocess.run(
-                ["aws", "s3", "sync", export_dir, upload_target],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            _upload_directory_to_s3(export_dir, upload_target)
             yield ALERTS["info_export_uploaded"][lang] + upload_target
-        except FileNotFoundError:
+        except ModuleNotFoundError:
             msg = ALERTS["err_export_upload_not_found"][lang]
             gr.Warning(msg)
             yield msg
             return
-        except subprocess.CalledProcessError as e:
-            msg = ALERTS["err_export_upload_failed"][lang] + f"\n\n```\n{e.stderr}\n```"
+        except Exception as e:
+            msg = ALERTS["err_export_upload_failed"][lang] + f"\n\n```\n{e}\n```"
             gr.Warning(msg)
             yield msg
             return
