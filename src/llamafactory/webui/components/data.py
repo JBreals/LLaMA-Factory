@@ -87,7 +87,7 @@ def get_preview(dataset_dir: str, dataset: list, page_index: int) -> tuple[int, 
 
 
 def create_preview_box(dataset_dir: "gr.Textbox", dataset: "gr.Dropdown") -> dict[str, "Component"]:
-    data_preview_btn = gr.Button(interactive=False, scale=1)
+    data_preview_btn = gr.Button(interactive=False, scale=1, visible=False)
     with gr.Column(visible=False, elem_classes="modal-box") as preview_box:
         with gr.Row():
             preview_count = gr.Number(value=0, interactive=False, precision=0)

@@ -46,7 +46,7 @@ def create_ui(demo_mode: bool = False) -> "gr.Blocks":
     )
     with gr.Blocks(title=f"LLaMA Factory ({hostname})", css=CSS + "\n" + pulse_css) as demo:
         title = gr.HTML()
-        subtitle = gr.HTML()
+        subtitle = gr.HTML(visible=False)
         if demo_mode:
             gr.DuplicateButton(value="Duplicate Space for private use", elem_classes="duplicate-button")
 

@@ -70,6 +70,7 @@ class Runner:
         """ State """
         self.aborted = False
         self.running = False
+        self.current_output_dir: Optional[str] = None
 
     def set_abort(self) -> None:
         self.aborted = True
@@ -131,6 +132,7 @@ class Runner:
         self.running = False
         self.running_data = None
         torch_gc()
+        self.current_output_dir = None
 
     def _resolve_model_name(self, getter, hub_name: str):
         sel = getter("top.model_name")
@@ -306,13 +308,14 @@ class Runner:
         user_config = load_config()
 
         # resolve output dir prefix
-        raw_output_dir = get("train.output_dir")
-        if raw_output_dir and not os.path.isabs(raw_output_dir):
-            resolved_output_dir = os.path.join("/app/storage/runs", raw_output_dir)
-        elif raw_output_dir:
-            resolved_output_dir = raw_output_dir
+        raw_output_dir = (get("train.output_dir") or "").strip()
+        default_train_leaf = f"train_{get('train.current_time')}"
+        if raw_output_dir and os.path.isabs(raw_output_dir):
+            train_output_args = (model_name, finetuning_type, raw_output_dir)
         else:
-            resolved_output_dir = os.path.join("/app/storage/runs", f"train_{get('train.current_time')}")
+            normalized = (raw_output_dir or default_train_leaf).strip().strip("/\\")
+            path_parts = [part for part in normalized.replace("\\", "/").split("/") if part] or [default_train_leaf]
+            train_output_args = (model_name, finetuning_type, *path_parts)
 
         args = dict(
             stage=TRAINING_STAGES[get("train.training_stage")],
@@ -352,7 +355,7 @@ class Runner:
             use_apollo=get("train.use_apollo"),
             use_badam=get("train.use_badam"),
             use_swanlab=get("train.use_swanlab"),
-            output_dir=get_save_dir(model_name, finetuning_type, resolved_output_dir),
+            output_dir=get_save_dir(*train_output_args),
             fp16=(get("train.compute_type") == "fp16"),
             bf16=(get("train.compute_type") == "bf16"),
             pure_bf16=(get("train.compute_type") == "pure_bf16"),
@@ -511,13 +514,14 @@ class Runner:
             model_path = self._download_s3_model(model_path, preferred_leaf=model_name)
         user_config = load_config()
 
-        raw_output_dir = get("eval.output_dir")
-        if raw_output_dir and not os.path.isabs(raw_output_dir):
-            resolved_output_dir = os.path.join("/app/storage/runs", raw_output_dir)
-        elif raw_output_dir:
-            resolved_output_dir = raw_output_dir
+        raw_output_dir = (get("eval.output_dir") or "").strip()
+        default_eval_leaf = f"eval_{get('train.current_time')}"
+        if raw_output_dir and os.path.isabs(raw_output_dir):
+            eval_output_args = (model_name, finetuning_type, raw_output_dir)
         else:
-            resolved_output_dir = os.path.join("/app/storage/runs", f"eval_{get('train.current_time')}")
+            normalized = (raw_output_dir or default_eval_leaf).strip().strip("/\\")
+            path_parts = [part for part in normalized.replace("\\", "/").split("/") if part] or [default_eval_leaf]
+            eval_output_args = (model_name, finetuning_type, *path_parts)
 
         args = dict(
             stage="sft",
@@ -540,7 +544,7 @@ class Runner:
             max_new_tokens=get("eval.max_new_tokens"),
             top_p=get("eval.top_p"),
             temperature=get("eval.temperature"),
-            output_dir=get_save_dir(model_name, finetuning_type, resolved_output_dir),
+            output_dir=get_save_dir(*eval_output_args),
             trust_remote_code=True,
             ddp_timeout=180000000,
         )
@@ -643,6 +647,7 @@ class Runner:
                 return
             yield {output_box: prep_msg + "\nPreparation finished. Launching..."}
 
+            self.current_output_dir = args.get("output_dir")
             os.makedirs(args["output_dir"], exist_ok=True)
             save_args(os.path.join(args["output_dir"], LLAMABOARD_CONFIG), self._build_config_dict(data))
 
@@ -694,8 +699,21 @@ class Runner:
 
         get = lambda elem_id: self.running_data[self.manager.get_elem_by_id(elem_id)]
         lang, model_name, finetuning_type = get("top.lang"), get("top.model_name"), get("top.finetuning_type")
-        output_dir = get("{}.output_dir".format("train" if self.do_train else "eval"))
-        output_path = get_save_dir(model_name, finetuning_type, output_dir)
+        raw_output_dir = get("{}.output_dir".format("train" if self.do_train else "eval"))
+        default_leaf = f"{'train' if self.do_train else 'eval'}_{get('train.current_time')}"
+
+        def _resolve_output_path(raw_value: Any) -> str:
+            if isinstance(raw_value, str) and raw_value.strip():
+                candidate = raw_value.strip()
+                if os.path.isabs(candidate):
+                    return candidate
+                parts = [seg for seg in candidate.replace("\\", "/").split("/") if seg]
+                if parts:
+                    return get_save_dir(model_name, finetuning_type, *parts)
+            # fallback to default leaf
+            return get_save_dir(model_name, finetuning_type, default_leaf)
+
+        output_path = self.current_output_dir or _resolve_output_path(raw_output_dir)
 
         output_box = self.manager.get_elem_by_id("{}.output_box".format("train" if self.do_train else "eval"))
         progress_bar = self.manager.get_elem_by_id("{}.progress_bar".format("train" if self.do_train else "eval"))

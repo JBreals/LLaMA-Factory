@@ -20,7 +20,7 @@ from collections.abc import Generator
 from typing import TYPE_CHECKING, Union
 from urllib.parse import urlparse
 
-from ...extras.constants import PEFT_METHODS
+from ...extras.constants import CHECKPOINT_NAMES, PEFT_METHODS
 from ...extras.misc import torch_gc
 from ...extras.packages import is_gradio_available
 from ...train.tuner import export_model
@@ -120,6 +120,8 @@ def save_model(
     export_legacy_format: bool,
     export_dir: str,
     export_hub_model_id: str,
+    train_output_dir: str,
+    train_current_time: str,
     extra_args: str,
 ) -> Generator[str, None, None]:
     user_config = load_config()
@@ -152,6 +154,55 @@ def save_model(
         else:
             export_dir = user_export_dir
 
+    def _split_segments(value: str) -> list[str]:
+        if not isinstance(value, str):
+            return []
+        normalized = value.strip().strip("/\\")
+        if not normalized:
+            return []
+        return [segment for segment in normalized.replace("\\", "/").split("/") if segment]
+
+    def _resolve_checkpoint_leaf(leaf: str) -> str:
+        if not model_name or not finetuning_type:
+            return leaf
+        if isinstance(leaf, str) and os.path.isabs(leaf.strip()):
+            return leaf.strip()
+        segments = _split_segments(leaf) if isinstance(leaf, str) else []
+        if not segments:
+            return get_save_dir(model_name, finetuning_type)
+        return get_save_dir(model_name, finetuning_type, *segments)
+
+    def _default_checkpoint_dir() -> str | None:
+        if not model_name or not finetuning_type:
+            return None
+        raw_output = (train_output_dir or "").strip()
+        if raw_output and os.path.isabs(raw_output):
+            return raw_output
+        fallback_leaf = ""
+        if isinstance(train_current_time, str) and train_current_time.strip():
+            fallback_leaf = f"train_{train_current_time.strip()}"
+        candidate = raw_output or fallback_leaf
+        segments = _split_segments(candidate)
+        if not segments:
+            return None
+        return get_save_dir(model_name, finetuning_type, *segments)
+
+    def _has_checkpoint_files(path: str) -> bool:
+        return os.path.isdir(path) and any(
+            os.path.isfile(os.path.join(path, name)) for name in CHECKPOINT_NAMES
+        )
+
+    resolved_checkpoint_paths: list[str] = []
+
+    if isinstance(checkpoint_path, list) and checkpoint_path:
+        resolved_checkpoint_paths = [
+            _resolve_checkpoint_leaf(leaf) for leaf in checkpoint_path if isinstance(leaf, str) and leaf.strip()
+        ]
+    elif isinstance(checkpoint_path, str) and checkpoint_path.strip():
+        resolved_checkpoint_paths = [_resolve_checkpoint_leaf(checkpoint_path)]
+
+    requires_checkpoint = export_quantization_bit not in GPTQ_BITS
+
     if not model_name:
         error = ALERTS["err_no_model"][lang]
     elif not model_path:
@@ -160,8 +211,6 @@ def save_model(
         error = ALERTS["err_no_export_dir"][lang]
     elif export_quantization_bit in GPTQ_BITS and not export_quantization_dataset:
         error = ALERTS["err_no_dataset"][lang]
-    elif export_quantization_bit not in GPTQ_BITS and not checkpoint_path:
-        error = ALERTS["err_no_adapter"][lang]
     elif export_quantization_bit in GPTQ_BITS and checkpoint_path and isinstance(checkpoint_path, list):
         error = ALERTS["err_gptq_lora"][lang]
 
@@ -169,6 +218,16 @@ def save_model(
         json.loads(extra_args)
     except json.JSONDecodeError:
         error = ALERTS["err_json_schema"][lang]
+
+    if not error and requires_checkpoint and not resolved_checkpoint_paths:
+        auto_checkpoint_dir = _default_checkpoint_dir()
+        if auto_checkpoint_dir and _has_checkpoint_files(auto_checkpoint_dir):
+            resolved_checkpoint_paths = [auto_checkpoint_dir]
+        else:
+            if auto_checkpoint_dir:
+                error = ALERTS["err_no_adapter"][lang] + f" ({auto_checkpoint_dir} not found)"
+            else:
+                error = ALERTS["err_no_adapter"][lang]
 
     if error:
         gr.Warning(error)
@@ -191,13 +250,11 @@ def save_model(
     )
     args.update(json.loads(extra_args))
 
-    if checkpoint_path:
-        if finetuning_type in PEFT_METHODS:  # list
-            args["adapter_name_or_path"] = ",".join(
-                [get_save_dir(model_name, finetuning_type, adapter) for adapter in checkpoint_path]
-            )
-        else:  # str
-            args["model_name_or_path"] = get_save_dir(model_name, finetuning_type, checkpoint_path)
+    if resolved_checkpoint_paths:
+        if finetuning_type in PEFT_METHODS:
+            args["adapter_name_or_path"] = ",".join(resolved_checkpoint_paths)
+        else:
+            args["model_name_or_path"] = resolved_checkpoint_paths[0]
 
     yield ALERTS["info_export_local"][lang]
     try:
@@ -273,6 +330,8 @@ def create_export_tab(engine: "Engine") -> dict[str, "Component"]:
             export_legacy_format,
             export_dir,
             export_hub_model_id,
+            engine.manager.get_elem_by_id("train.output_dir"),
+            engine.manager.get_elem_by_id("train.current_time"),
             extra_args,
         ],
         [info_box],
