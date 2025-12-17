@@ -238,6 +238,26 @@ class Runner:
             return trimmed
         return "lakefs://" + trimmed.lstrip("/")
 
+    @staticmethod
+    def _lakefs_key_seems_directory(key: str) -> bool:
+        r"""Heuristically determine whether a LakeFS key refers to a folder."""
+        if not key:
+            return True
+        normalized = key.rstrip("/")
+        if not normalized:
+            return True
+        if key.endswith("/"):
+            return True
+        leaf = normalized.split("/")[-1]
+        # Keys without an extension are typically dataset folders
+        return "." not in leaf
+
+    @staticmethod
+    def _should_retry_without_recursive(error_output: str) -> bool:
+        r"""Detect if lakectl complained about recursive download on a file."""
+        lowered = error_output.lower()
+        return "not a directory" in lowered or "is a file" in lowered
+
     def _download_lakefs_datasets(self, uris: list[str]) -> list[str]:
         r"""Download lakeFS paths to a local cache directory and return local folders."""
         if not uris:
@@ -273,9 +293,19 @@ class Runner:
                 os.remove(target_dir)
             os.makedirs(target_dir, exist_ok=True)
 
+            recursive = os.getenv("LAKECTL_FORCE_RECURSIVE", "").lower() in {"1", "true", "yes"}
+            if not recursive:
+                recursive = self._lakefs_key_seems_directory(key)
+
+            base_cmd = [binary, "fs", "download"]
+            cmd = base_cmd.copy()
+            if recursive:
+                cmd.append("--recursive")
+            cmd.extend([uri, target_dir])
+
             try:
                 subprocess.run(
-                    [binary, "fs", "download", uri, target_dir],
+                    cmd,
                     check=True,
                     capture_output=True,
                     text=True,
@@ -284,7 +314,22 @@ class Runner:
                 raise RuntimeError("lakectl CLI not found. Install lakectl or choose another data source.") from exc
             except subprocess.CalledProcessError as exc:
                 err_msg = exc.stderr.strip() or exc.stdout.strip() or str(exc)
-                raise RuntimeError(f"lakectl download failed for {uri}: {err_msg}") from exc
+                if recursive and not os.getenv("LAKECTL_FORCE_RECURSIVE") and self._should_retry_without_recursive(err_msg):
+                    retry_cmd = base_cmd + [uri, target_dir]
+                    try:
+                        subprocess.run(
+                            retry_cmd,
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        )
+                    except subprocess.CalledProcessError as retry_exc:
+                        retry_err = retry_exc.stderr.strip() or retry_exc.stdout.strip() or str(retry_exc)
+                        raise RuntimeError(
+                            f"lakectl download failed for {uri} (retried without --recursive): {retry_err}"
+                        ) from retry_exc
+                else:
+                    raise RuntimeError(f"lakectl download failed for {uri}: {err_msg}") from exc
 
             if not os.path.exists(target_dir):
                 raise RuntimeError(f"lakectl download did not produce {target_dir}")

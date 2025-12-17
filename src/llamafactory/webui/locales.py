@@ -17,19 +17,19 @@ SAMANDA_LOGO_SVG = """<svg width="25" height="37" viewBox="0 0 25 37" fill="none
 LOCALES = {
     "title": {
         "en": {
-            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;Samanda LLMOps</center></h1>",
+            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;SAMANDA LLMOps</center></h1>",
         },
         "ru": {
-            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;Samanda LLMOps</center></h1>",
+            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;SAMANDA LLMOps</center></h1>",
         },
         "zh": {
-            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;Samanda LLMOps</center></h1>",
+            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;SAMANDA LLMOps</center></h1>",
         },
         "ko": {
-            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;Samanda LLMOps</center></h1>",
+            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;SAMANDA LLMOps</center></h1>",
         },
         "ja": {
-            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;Samanda LLMOps</center></h1>",
+            "value": f"<h1><center>{SAMANDA_LOGO_SVG}&nbsp;SAMANDA LLMOps</center></h1>",
         },
     },
     "subtitle": {
