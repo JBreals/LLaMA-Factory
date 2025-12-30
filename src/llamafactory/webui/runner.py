@@ -258,6 +258,50 @@ class Runner:
         lowered = error_output.lower()
         return "not a directory" in lowered or "is a file" in lowered
 
+    def _resolve_desired_output_dir(self, data: dict["Component", Any], do_train: bool) -> str:
+        r"""Resolve the user-facing output directory."""
+        get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
+        hub_name = get("top.hub_name")
+        model_name = self._resolve_model_name(get, hub_name)
+        finetuning_type = get("top.finetuning_type")
+        prefix = "train" if do_train else "eval"
+        raw_value = (get(f"{prefix}.output_dir") or "").strip()
+        default_leaf = f"{prefix}_{get('train.current_time')}"
+        if raw_value and os.path.isabs(raw_value):
+            args = (model_name, finetuning_type, raw_value)
+        else:
+            normalized = (raw_value or default_leaf).strip().strip("/\\")
+            parts = [seg for seg in normalized.replace("\\", "/").split("/") if seg] or [default_leaf]
+            args = (model_name, finetuning_type, *parts)
+        return get_save_dir(*args)
+
+    @staticmethod
+    def _dir_is_non_empty(path: str) -> bool:
+        if not path or not os.path.isdir(path):
+            return False
+        try:
+            with os.scandir(path) as iterator:
+                for _ in iterator:
+                    return True
+        except OSError:
+            return False
+        return False
+
+    def _overwrite_prompt_update(self, lang: str, do_train: bool, visible: bool, message: str = "") -> dict[Any, Any]:
+        prefix = "train" if do_train else "eval"
+        prompt_elem = self.manager.get_elem_by_id(f"{prefix}.overwrite_prompt")
+        button_elem = self.manager.get_elem_by_id(f"{prefix}.overwrite_confirm_btn")
+        default_prompt = LOCALES["overwrite_prompt"][lang]["value"]
+        prompt_kwargs = {"visible": visible, "value": message or default_prompt}
+        button_kwargs = {
+            "visible": visible,
+            "value": LOCALES["overwrite_confirm_btn"][lang]["value"],
+        }
+        return {
+            prompt_elem: prompt_elem.__class__(**prompt_kwargs),
+            button_elem: button_elem.__class__(**button_kwargs),
+        }
+
     def _download_lakefs_datasets(self, uris: list[str]) -> list[str]:
         r"""Download lakeFS paths to a local cache directory and return local folders."""
         if not uris:
@@ -663,23 +707,39 @@ class Runner:
                 return
             yield {output_box: gen_cmd(args)}
 
-    def _launch(self, data: dict["Component", Any], do_train: bool) -> Generator[dict["Component", Any], None, None]:
+    def _launch(
+        self, data: dict["Component", Any], do_train: bool, force_overwrite: bool
+    ) -> Generator[dict["Component", Any], None, None]:
         r"""Start the training process."""
         output_box = self.manager.get_elem_by_id("{}.output_box".format("train" if do_train else "eval"))
+        get = lambda elem_id: data[self.manager.get_elem_by_id(elem_id)]
+        lang = get("top.lang")
+        hide_prompt = self._overwrite_prompt_update(lang, do_train, visible=False)
         error = self._initialize(data, do_train, from_preview=False)
         if error:
             gr.Warning(error)
             yield {output_box: error}
         else:
+            target_dir = self._resolve_desired_output_dir(data, do_train)
+            if not force_overwrite and self._dir_is_non_empty(target_dir):
+                message = ALERTS["ask_overwrite"][lang].format(path=target_dir)
+                prompt_payload = self._overwrite_prompt_update(lang, do_train, True, message)
+                prompt_payload[output_box] = message
+                yield prompt_payload
+                return
             self.do_train, self.running_data = do_train, data
             prep_msg = "Preparing model/data (downloading remote sources if needed)..."
-            yield {output_box: prep_msg}
+            first_update = {output_box: prep_msg}
+            first_update.update(hide_prompt)
+            yield first_update
             try:
                 args = (
                     self._parse_train_args(data, download_model=True)
                     if do_train
                     else self._parse_eval_args(data, download_model=True)
                 )
+                if force_overwrite:
+                    args["overwrite_output_dir"] = True
                 # Failsafe: if still s3://, force download and replace
                 model_path = args.get("model_name_or_path")
                 if isinstance(model_path, str) and model_path.startswith("s3://"):
@@ -690,7 +750,9 @@ class Runner:
                 gr.Warning(message)
                 yield {output_box: message}
                 return
-            yield {output_box: prep_msg + "\nPreparation finished. Launching..."}
+            second_update = {output_box: prep_msg + "\nPreparation finished. Launching..."}
+            second_update.update(hide_prompt)
+            yield second_update
 
             self.current_output_dir = args.get("output_dir")
             os.makedirs(args["output_dir"], exist_ok=True)
@@ -732,10 +794,16 @@ class Runner:
         yield from self._preview(data, do_train=False)
 
     def run_train(self, data):
-        yield from self._launch(data, do_train=True)
+        yield from self._launch(data, do_train=True, force_overwrite=False)
 
     def run_eval(self, data):
-        yield from self._launch(data, do_train=False)
+        yield from self._launch(data, do_train=False, force_overwrite=False)
+
+    def force_run_train(self, data):
+        yield from self._launch(data, do_train=True, force_overwrite=True)
+
+    def force_run_eval(self, data):
+        yield from self._launch(data, do_train=False, force_overwrite=True)
 
     def monitor(self):
         r"""Monitorgit the training progress and logs."""

@@ -66,6 +66,10 @@ def create_eval_tab(engine: "Engine") -> dict[str, "Component"]:
         stop_btn = gr.Button(variant="stop")
 
     with gr.Row():
+        overwrite_prompt = gr.Markdown(visible=False)
+        overwrite_confirm_btn = gr.Button(visible=False, variant="secondary")
+
+    with gr.Row():
         resume_btn = gr.Checkbox(visible=False, interactive=False)
         progress_bar = gr.Slider(visible=False, interactive=False)
 
@@ -80,12 +84,15 @@ def create_eval_tab(engine: "Engine") -> dict[str, "Component"]:
             resume_btn=resume_btn,
             progress_bar=progress_bar,
             output_box=output_box,
+            overwrite_prompt=overwrite_prompt,
+            overwrite_confirm_btn=overwrite_confirm_btn,
         )
     )
-    output_elems = [output_box, progress_bar]
+    output_elems = [output_box, progress_bar, overwrite_prompt, overwrite_confirm_btn]
 
     cmd_preview_btn.click(engine.runner.preview_eval, input_elems, output_elems, concurrency_limit=None)
     start_btn.click(engine.runner.run_eval, input_elems, output_elems)
+    overwrite_confirm_btn.click(engine.runner.force_run_eval, input_elems, output_elems)
     stop_btn.click(engine.runner.set_abort)
     resume_btn.change(engine.runner.monitor, outputs=output_elems, concurrency_limit=None)
 

@@ -378,6 +378,10 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
         stop_btn = gr.Button(variant="stop")
 
     with gr.Row():
+        overwrite_prompt = gr.Markdown(visible=False)
+        overwrite_confirm_btn = gr.Button(visible=False, variant="secondary")
+
+    with gr.Row():
         with gr.Column(scale=3):
             with gr.Row():
                 current_time = gr.Textbox(visible=False, interactive=False)
@@ -417,12 +421,15 @@ def create_train_tab(engine: "Engine") -> dict[str, "Component"]:
             progress_bar=progress_bar,
             output_box=output_box,
             loss_viewer=loss_viewer,
+            overwrite_prompt=overwrite_prompt,
+            overwrite_confirm_btn=overwrite_confirm_btn,
         )
     )
-    output_elems = [output_box, progress_bar, loss_viewer, swanlab_link]
+    output_elems = [output_box, progress_bar, loss_viewer, swanlab_link, overwrite_prompt, overwrite_confirm_btn]
 
     cmd_preview_btn.click(engine.runner.preview_train, input_elems, output_elems, concurrency_limit=None)
     start_btn.click(engine.runner.run_train, input_elems, output_elems)
+    overwrite_confirm_btn.click(engine.runner.force_run_train, input_elems, output_elems)
     stop_btn.click(engine.runner.set_abort)
     resume_btn.change(engine.runner.monitor, outputs=output_elems, concurrency_limit=None)
 

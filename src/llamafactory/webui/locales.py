@@ -2492,6 +2492,20 @@ LOCALES = {
             "value": "準備完了。",
         },
     },
+    "overwrite_prompt": {
+        "en": {"value": "Output directory already exists. Overwrite?"},
+        "ru": {"value": "Выходная директория уже существует. Перезаписать?"},
+        "zh": {"value": "输出目录已存在，是否覆盖？"},
+        "ko": {"value": "출력 디렉토리가 이미 존재합니다. 덮어쓸까요?"},
+        "ja": {"value": "出力ディレクトリが既に存在します。上書きしますか？"},
+    },
+    "overwrite_confirm_btn": {
+        "en": {"value": "Overwrite"},
+        "ru": {"value": "Перезаписать"},
+        "zh": {"value": "覆盖"},
+        "ko": {"value": "덮어쓰기"},
+        "ja": {"value": "上書き"},
+    },
     "loss_viewer": {
         "en": {
             "label": "Loss",
@@ -3164,6 +3178,13 @@ ALERTS = {
         "zh": "输出目录已存在，将从该断点恢复训练。",
         "ko": "출력 디렉토리가 이미 존재합니다. 위 출력 디렉토리에 저장된 학습을 재개합니다.",
         "ja": "出力ディレクトリが既に存在します。このチェックポイントからトレーニングを再開します。",
+    },
+    "ask_overwrite": {
+        "en": "Output directory already exists at {path}. Overwrite the contents?",
+        "ru": "Выходной каталог уже существует по пути {path}. Перезаписать содержимое?",
+        "zh": "输出目录 {path} 已存在。要覆盖其中的内容吗？",
+        "ko": "출력 디렉토리 {path} 가 이미 존재합니다. 내용을 덮어쓸까요?",
+        "ja": "出力ディレクトリ {path} は既に存在します。上書きしますか？",
     },
     "warn_no_instruct": {
         "en": "You are using a non-instruct model, please fine-tune it first.",
